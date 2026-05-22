@@ -25,9 +25,11 @@ class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
 
   /// Creates a new audio recorder.
   AudioRecorder() : _recorderId = UuidV4.generate() {
-    _semaphore.acquire();
-
-    _platform.create(_recorderId).whenComplete(() => _semaphore.release());
+    _semaphore.acquire().whenComplete(
+          () => _platform
+              .create(_recorderId)
+              .whenComplete(() => _semaphore.release()),
+        );
   }
 
   /// Starts new recording session.

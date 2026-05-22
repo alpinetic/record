@@ -23,18 +23,24 @@ mixin _StateMixin {
 
     _stateStreamCtrl = StreamController<RecordState>.broadcast();
 
-    _stateStreamSubscription = platform.onStateChanged(recorderId).listen(
-      (state) {
-        if (_stateStreamCtrl case final ctrl? when ctrl.hasListener) {
-          ctrl.add(state);
-        }
+    _semaphore.acquire().whenComplete(
+      () {
+        _stateStreamSubscription = platform.onStateChanged(recorderId).listen(
+          (state) {
+            if (_stateStreamCtrl case final ctrl? when ctrl.hasListener) {
+              ctrl.add(state);
+            }
 
-        onStateChanged(state);
-      },
-      onError: (error) {
-        if (_stateStreamCtrl case final ctrl? when ctrl.hasListener) {
-          ctrl.addError(error);
-        }
+            onStateChanged(state);
+          },
+          onError: (error) {
+            if (_stateStreamCtrl case final ctrl? when ctrl.hasListener) {
+              ctrl.addError(error);
+            }
+          },
+        );
+
+        _semaphore.release();
       },
     );
 
