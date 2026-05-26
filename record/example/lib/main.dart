@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -24,22 +22,9 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         body: Center(
           child: audioPath != null
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 25),
-                  child: AudioPlayer(
-                    source: audioPath!,
-                    onDelete: () {
-                      if (!kIsWeb) {
-                        try {
-                          File(audioPath!).deleteSync();
-                        } catch (_) {
-                          // Ignored
-                        }
-                      }
-
-                      setState(() => audioPath = null);
-                    },
-                  ),
+              ? AudioPlayer(
+                  source: audioPath!,
+                  onDelete: () => setState(() => audioPath = null),
                 )
               : Recorder(
                   onStop: (path) {

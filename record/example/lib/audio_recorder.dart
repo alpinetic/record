@@ -35,8 +35,8 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
     _amplitudeSub = _audioRecorder
         .onAmplitudeChanged(const Duration(milliseconds: 300))
         .listen((amp) {
-      setState(() => _amplitude = amp);
-    });
+          setState(() => _amplitude = amp);
+        });
 
     super.initState();
   }
@@ -104,9 +104,7 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
   }
 
   Future<bool> _isEncoderSupported(AudioEncoder encoder) async {
-    final isSupported = await _audioRecorder.isEncoderSupported(
-      encoder,
-    );
+    final isSupported = await _audioRecorder.isEncoderSupported(encoder);
 
     if (!isSupported) {
       debugPrint('${encoder.name} is not supported on this platform.');
@@ -234,12 +232,7 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
   }
 
   String _formatNumber(int number) {
-    String numberStr = number.toString();
-    if (number < 10) {
-      numberStr = '0$numberStr';
-    }
-
-    return numberStr;
+    return '$number'.padLeft(2, '0');
   }
 
   void _startTimer() {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:audioplayers/audioplayers.dart';
@@ -13,11 +14,7 @@ class AudioPlayer extends StatefulWidget {
   /// Setting this to null hides the delete button
   final VoidCallback onDelete;
 
-  const AudioPlayer({
-    super.key,
-    required this.source,
-    required this.onDelete,
-  });
+  const AudioPlayer({super.key, required this.source, required this.onDelete});
 
   @override
   AudioPlayerState createState() => AudioPlayerState();
@@ -36,8 +33,9 @@ class AudioPlayerState extends State<AudioPlayer> {
 
   @override
   void initState() {
-    _playerStateChangedSubscription =
-        _audioPlayer.onPlayerComplete.listen((state) async {
+    _playerStateChangedSubscription = _audioPlayer.onPlayerComplete.listen((
+      state,
+    ) async {
       await stop();
     });
     _positionChangedSubscription = _audioPlayer.onPositionChanged.listen(
@@ -67,34 +65,40 @@ class AudioPlayerState extends State<AudioPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                _buildControl(),
-                _buildSlider(constraints.maxWidth),
-                IconButton(
-                  icon: const Icon(Icons.delete,
-                      color: Color(0xFF73748D), size: _deleteBtnSize),
-                  onPressed: () {
-                    if (_audioPlayer.state == ap.PlayerState.playing) {
-                      stop().then((value) => widget.onDelete());
-                    } else {
-                      widget.onDelete();
-                    }
-                  },
-                ),
-              ],
-            ),
-            Text('${_duration ?? 0.0}'),
-          ],
-        );
-      },
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 25),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  _buildControl(),
+                  _buildSlider(constraints.maxWidth),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Color(0xFF73748D),
+                      size: _deleteBtnSize,
+                    ),
+                    onPressed: () {
+                      if (_audioPlayer.state == ap.PlayerState.playing) {
+                        stop().then((value) => delete());
+                      } else {
+                        delete();
+                      }
+                    },
+                  ),
+                ],
+              ),
+              Text('${_duration ?? 0.0}'),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -115,8 +119,11 @@ class AudioPlayerState extends State<AudioPlayer> {
       child: Material(
         color: color,
         child: InkWell(
-          child:
-              SizedBox(width: _controlSize, height: _controlSize, child: icon),
+          child: SizedBox(
+            width: _controlSize,
+            height: _controlSize,
+            child: icon,
+          ),
           onTap: () {
             if (_audioPlayer.state == ap.PlayerState.playing) {
               pause();
@@ -170,6 +177,18 @@ class AudioPlayerState extends State<AudioPlayer> {
   Future<void> stop() async {
     await _audioPlayer.stop();
     setState(() {});
+  }
+
+  void delete() {
+    if (!kIsWeb) {
+      try {
+        File(widget.source).deleteSync();
+      } catch (_) {
+        // Ignored
+      }
+    }
+
+    widget.onDelete();
   }
 
   Source get _source =>
