@@ -73,21 +73,26 @@ extension AudioRecordingDelegate {
     guard let config = self.config else {
       return
     }
-  
-    if type == AVAudioSession.InterruptionType.began {
+    
+    switch type {
+    case .began:
       if config.audioInterruption != AudioInterruptionMode.none {
         pause()
       }
-    } else if type == AVAudioSession.InterruptionType.ended {
-      if config.audioInterruption == AudioInterruptionMode.pauseResume {
-        do {
-          try AVAudioSession.sharedInstance().setActive(true)
-          try resume()
-        } catch {
-          print("Unable to resume the recording: \(error.localizedDescription)")
-          stop { path in }
-        }
+    case .ended:
+      guard config.audioInterruption == AudioInterruptionMode.pauseResume else { return }
+
+      guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
+      let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+      guard options.contains(.shouldResume) else { return }
+      
+      do {
+        try AVAudioSession.sharedInstance().setActive(true)
+        try resume()
+      } catch {
+        print("Unable to resume the recording: \(error.localizedDescription)")
       }
+    default: ()
     }
   }
 
