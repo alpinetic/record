@@ -28,15 +28,15 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
   void initState() {
     _audioRecorder = AudioRecorder();
 
-    _recordSub = _audioRecorder.onStateChanged().listen((recordState) {
-      _updateRecordState(recordState);
-    });
+    // Subscribe to state changes
+    _recordSub = _audioRecorder.onStateChanged().listen(
+      (recordState) => _updateRecordState(recordState),
+    );
 
+    // Subscribe to amplitude changes
     _amplitudeSub = _audioRecorder
         .onAmplitudeChanged(const Duration(milliseconds: 300))
-        .listen((amp) {
-          setState(() => _amplitude = amp);
-        });
+        .listen((amp) => setState(() => _amplitude = amp));
 
     super.initState();
   }
@@ -44,26 +44,22 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
   Future<void> _start() async {
     try {
       if (await _audioRecorder.hasPermission()) {
+        final devs = await _audioRecorder.listInputDevices();
+        debugPrint(devs.toString());
+
         const encoder = AudioEncoder.aacLc;
 
         if (!await _isEncoderSupported(encoder)) {
           return;
         }
 
-        final devs = await _audioRecorder.listInputDevices();
-        debugPrint(devs.toString());
-
         const config = RecordConfig(encoder: encoder, numChannels: 1);
 
         // Record to file
         await recordFile(_audioRecorder, config);
 
-        // Record to stream
+        // or record to stream
         // await recordStream(_audioRecorder, config);
-
-        _recordDuration = 0;
-
-        _startTimer();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -92,14 +88,11 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
     switch (recordState) {
       case RecordState.pause:
         _timer?.cancel();
-        break;
       case RecordState.record:
         _startTimer();
-        break;
       case RecordState.stop:
         _timer?.cancel();
         _recordDuration = 0;
-        break;
     }
   }
 
@@ -122,29 +115,32 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        body: Column(
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      spacing: 40,
+      children: [
+        Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                _buildRecordStopControl(),
-                const SizedBox(width: 20),
-                _buildPauseResumeControl(),
-                const SizedBox(width: 20),
-                _buildText(),
-              ],
+          spacing: 20,
+          children: <Widget>[
+            _RecordStopControl(_recordState, onStart: _start, onStop: _stop),
+            _PauseResumeControl(
+              _recordState,
+              onPause: _pause,
+              onResume: _resume,
             ),
-            if (_amplitude != null) ...[
-              const SizedBox(height: 40),
+            _Timer(_recordState, _recordDuration),
+          ],
+        ),
+        if (_amplitude != null) ...[
+          Column(
+            children: [
               Text('Current: ${_amplitude?.current ?? 0.0}'),
               Text('Max: ${_amplitude?.max ?? 0.0}'),
             ],
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -157,7 +153,58 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
     super.dispose();
   }
 
-  Widget _buildRecordStopControl() {
+  void _startTimer() {
+    _timer?.cancel();
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+      setState(() => _recordDuration++);
+    });
+  }
+}
+
+class _Timer extends StatelessWidget {
+  final RecordState _recordState;
+  final int _recordDuration;
+
+  const _Timer(this._recordState, this._recordDuration);
+
+  @override
+  Widget build(BuildContext context) {
+    if (_recordState != RecordState.stop) {
+      return _buildTimer();
+    }
+
+    return const Text("Waiting for recording");
+  }
+
+  Widget _buildTimer() {
+    String formatNumber(int number) {
+      return '$number'.padLeft(2, '0');
+    }
+
+    final String minutes = formatNumber(_recordDuration ~/ 60);
+    final String seconds = formatNumber(_recordDuration % 60);
+
+    return Text(
+      '$minutes : $seconds',
+      style: const TextStyle(color: Colors.red),
+    );
+  }
+}
+
+class _RecordStopControl extends StatelessWidget {
+  final RecordState _recordState;
+  final VoidCallback onStop;
+  final VoidCallback onStart;
+
+  const _RecordStopControl(
+    this._recordState, {
+    required this.onStart,
+    required this.onStop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     late Icon icon;
     late Color color;
 
@@ -176,14 +223,27 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
         child: InkWell(
           child: SizedBox(width: 56, height: 56, child: icon),
           onTap: () {
-            (_recordState != RecordState.stop) ? _stop() : _start();
+            (_recordState != RecordState.stop) ? onStop() : onStart();
           },
         ),
       ),
     );
   }
+}
 
-  Widget _buildPauseResumeControl() {
+class _PauseResumeControl extends StatelessWidget {
+  final RecordState _recordState;
+  final VoidCallback onResume;
+  final VoidCallback onPause;
+
+  const _PauseResumeControl(
+    this._recordState, {
+    required this.onPause,
+    required this.onResume,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     if (_recordState == RecordState.stop) {
       return const SizedBox.shrink();
     }
@@ -206,40 +266,10 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
         child: InkWell(
           child: SizedBox(width: 56, height: 56, child: icon),
           onTap: () {
-            (_recordState == RecordState.pause) ? _resume() : _pause();
+            (_recordState == RecordState.pause) ? onResume() : onPause();
           },
         ),
       ),
     );
-  }
-
-  Widget _buildText() {
-    if (_recordState != RecordState.stop) {
-      return _buildTimer();
-    }
-
-    return const Text("Waiting to record");
-  }
-
-  Widget _buildTimer() {
-    final String minutes = _formatNumber(_recordDuration ~/ 60);
-    final String seconds = _formatNumber(_recordDuration % 60);
-
-    return Text(
-      '$minutes : $seconds',
-      style: const TextStyle(color: Colors.red),
-    );
-  }
-
-  String _formatNumber(int number) {
-    return '$number'.padLeft(2, '0');
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
-      setState(() => _recordDuration++);
-    });
   }
 }

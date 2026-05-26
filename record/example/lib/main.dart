@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:record_example/audio_player.dart';
@@ -28,7 +27,7 @@ class _MyAppState extends State<MyApp> {
                 )
               : Recorder(
                   onStop: (path) {
-                    if (kDebugMode) print('Recorded file path: $path');
+                    debugPrint('Recorded file path: $path');
                     setState(() => audioPath = path);
                   },
                 ),

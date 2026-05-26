@@ -33,20 +33,14 @@ class AudioPlayerState extends State<AudioPlayer> {
 
   @override
   void initState() {
-    _playerStateChangedSubscription = _audioPlayer.onPlayerComplete.listen((
-      state,
-    ) async {
-      await stop();
-    });
+    _playerStateChangedSubscription = _audioPlayer.onPlayerComplete.listen(
+      (state) async => await stop(),
+    );
     _positionChangedSubscription = _audioPlayer.onPositionChanged.listen(
-      (position) => setState(() {
-        _position = position;
-      }),
+      (position) => setState(() => _position = position),
     );
     _durationChangedSubscription = _audioPlayer.onDurationChanged.listen(
-      (duration) => setState(() {
-        _duration = duration;
-      }),
+      (duration) => setState(() => _duration = duration),
     );
 
     _audioPlayer.setSource(_source);
