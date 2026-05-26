@@ -1,8 +1,20 @@
 ## 7.0.0
 * chore: Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
+* Android:
+    * chore: **Breaking change** Remove background recording service. See [docs](https://github.com/llfbandit/record/blob/master/doc/bg_recording.md).
+    * chore: Move to AGP 9.x.
+    * chore: Move to Kotlin Gradle DSL.
+* iOS:
+    * fix: Respect `shouldResume` system flag on audio interruption and don't stop on resume failure.
+    * chore: **Breaking change** Remove `manageAudioSession` deprecated config property.
+    * chore: Completes Swift Package Manager integration.
+* macOS:
+    * chore: Completes Swift Package Manager integration.
+* web:
+    * feat: JS assets are now web platform-specific assets. No more js files in other platform builds.
 
 ## 6.2.1
-__This version is the last before v7 which will raise SDK versions to Flutter 3.44/Dart 3.13.__
+__This version is the last before v7 which will raise SDK versions to Flutter 3.44/Dart 3.12.__
 
 * fix: Stop requesting for amplitude updates when recording is paused or stopped from native side.
 * chore: Code cleanup.
@@ -237,7 +249,7 @@ This contains very small breaking changes. See below.
 * core: Update dependencies.
 * core: README.md updates.
 * core: License changed from Apache 2.0 to BSD-3-Clause.
-
+* 
 * feat: Add Windows platform support.
 * feat: Add macOS platform support.
 * feat: Codec is now applied in web platform (if available).
