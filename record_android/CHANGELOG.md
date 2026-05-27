@@ -1,3 +1,6 @@
+## 2.0.1
+* fix: Build issue.
+
 ## 2.0.0
 * chore: **Breaking change** Remove background recording service.
 * chore: Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
