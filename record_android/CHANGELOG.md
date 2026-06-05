@@ -1,3 +1,20 @@
+## 2.0.2
+* fix: Prevents potential double pause event.
+* fix: Potential two stop events fired.
+* fix: Prevents potential NPE.
+* fix: Remove useless check.
+* fix: Potential file description leak.
+* fix: onOutputFormatChanged has no guard against being called more than once.
+* fix: Wait the end of the recording before deleting the file on `cancel` call.
+* fix: Potentially no result when starting recorder without stopping first.
+* fix: Useless check of codec.
+* fix: Silent frames now return -160.0 instead of -Infinity.
+* fix: Cancelled recordings may leave partial files on disk.
+* fix: Encoding may not be stopped if PCM reader fails to stop.
+* fix: Wrong channel count adjustment.
+* fix: Race condition. BUFFER_FLAG_END_OF_STREAM never queued if last encode() runs before mStoppedCompleter is assigned.
+
+
 ## 2.0.1
 * fix: Build issue.
 
