@@ -233,13 +233,17 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   private func encodeAac(buffer: AVAudioPCMBuffer) -> [Data]? {
     // Lazily initialize AAC encoder
     if m_audioEncoder == nil {
-      m_audioEncoder = AacAdtsEncoder()
+      guard let config = config, let outputFormat = m_outputFormat else {
+        return nil
+      }
+      let encoder = AacAdtsEncoder()
       do {
-        try m_audioEncoder!.setup(config: config!, format: m_outputFormat!)
+        try encoder.setup(config: config, format: outputFormat)
       } catch {
         print("Failed to setup AAC encoder: \(error)")
         return nil
       }
+      m_audioEncoder = encoder
     }
 
     guard let encoder = m_audioEncoder else {
