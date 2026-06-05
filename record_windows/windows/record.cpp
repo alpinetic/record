@@ -157,7 +157,7 @@ namespace record_windows
 			}
 		}
 
-		return S_OK;
+		return hr;
 	}
 
 	HRESULT Recorder::Resume()
