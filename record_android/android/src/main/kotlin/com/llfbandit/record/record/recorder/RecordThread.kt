@@ -134,10 +134,18 @@ class RecordThread(
 
   private fun stopAndRelease(pcmReader: PCMReader?, encoder: IEncoder?) {
     try {
-      pcmReader?.stop()
-      pcmReader?.release()
+      try {
+        pcmReader?.stop()
+        pcmReader?.release()
+      } catch (ex: Exception) {
+        recorderListener.onFailure(ex)
+      }
 
-      encoder?.stopEncoding()
+      try {
+        encoder?.stopEncoding()
+      } catch (ex: Exception) {
+        recorderListener.onFailure(ex)
+      }
 
       if (mHasBeenCanceled) {
         Utils.deleteFile(config.path)
