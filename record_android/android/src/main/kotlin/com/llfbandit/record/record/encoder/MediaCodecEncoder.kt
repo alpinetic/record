@@ -186,12 +186,8 @@ class MediaCodecEncoder(
       mCodec = null
     }
 
-    try {
-      mContainer?.stop()
-    } finally {
-      mContainer?.release()
-      mContainer = null
-    }
+    mContainer?.release()
+    mContainer = null
 
     mStoppedCompleter?.release()
     mStoppedCompleter = null

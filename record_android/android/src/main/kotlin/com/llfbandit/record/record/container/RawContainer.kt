@@ -40,6 +40,8 @@ class RawContainer(private val path: String?) : IContainerWriter {
   override fun release() {
     if (isStarted) {
       stop()
+    } else {
+      runCatching { file?.close() }
     }
   }
 

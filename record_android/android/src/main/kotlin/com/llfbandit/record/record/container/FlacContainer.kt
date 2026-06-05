@@ -43,6 +43,8 @@ class FlacContainer(path: String) : IContainerWriter {
   override fun release() {
     if (isStarted) {
       stop()
+    } else {
+      runCatching { file.close() }
     }
   }
 

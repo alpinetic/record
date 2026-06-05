@@ -49,6 +49,8 @@ class WaveContainer(path: String, private val frameSize: Int) : IContainerWriter
   override fun release() {
     if (isStarted) {
       stop()
+    } else {
+      runCatching { file.close() }
     }
   }
 

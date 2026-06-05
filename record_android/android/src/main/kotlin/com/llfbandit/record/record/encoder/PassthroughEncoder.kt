@@ -44,7 +44,7 @@ class PassthroughEncoder(
   override fun stopEncoding() {
     if (mIsStarted) {
       mIsStarted = false
-      mContainer.stop()
+      mContainer.release()
     }
   }
 
