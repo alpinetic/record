@@ -15,6 +15,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
 
   private var m_audioEncoder: AudioEnc?
   private var m_outputFormat: AVAudioFormat?
+  private var m_interruptionObserver: NSObjectProtocol?
   
   init(manageAudioSession: Bool, onRecord: @escaping () -> (), onPause: @escaping () -> (), onStop: @escaping () -> ()) {
     m_manageAudioSession = manageAudioSession
@@ -26,7 +27,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   func start(config: RecordConfig, recordEventHandler: RecordStreamHandler) throws {
     let audioEngine = AVAudioEngine()
 
-    try initAVAudioSession(config: config, manageAudioSession: m_manageAudioSession)
+    m_interruptionObserver = try initAVAudioSession(config: config, manageAudioSession: m_manageAudioSession)
     try setVoiceProcessing(echoCancel: config.echoCancel, autoGain: config.autoGain, audioEngine: audioEngine)
 
     let srcFormat = audioEngine.inputNode.inputFormat(forBus: 0)
@@ -77,6 +78,11 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   }
   
   func stop(completionHandler: @escaping (String?) -> ()) {
+    if let observer = m_interruptionObserver {
+      NotificationCenter.default.removeObserver(observer)
+      m_interruptionObserver = nil
+    }
+
     if let audioEngine = m_audioEngine {
       do {
         try setVoiceProcessing(echoCancel: false, autoGain: false, audioEngine: audioEngine)

@@ -1,7 +1,8 @@
 import AVFoundation
 
 extension AudioRecordingDelegate {
-  func initAVAudioSession(config: RecordConfig, manageAudioSession: Bool) throws {
+  @discardableResult
+  func initAVAudioSession(config: RecordConfig, manageAudioSession: Bool) throws -> NSObjectProtocol {
     let audioSession = AVAudioSession.sharedInstance()
     
     do {
@@ -56,11 +57,13 @@ extension AudioRecordingDelegate {
       throw RecorderError.error(message: "Failed to start recording", details: "setInput: \(error.localizedDescription)")
     }
     
-    NotificationCenter.default.addObserver(
+    let observer = NotificationCenter.default.addObserver(
       forName: AVAudioSession.interruptionNotification,
       object: nil,
       queue: nil,
       using: onAudioSessionInterruption)
+
+    return observer
   }
 
   private func onAudioSessionInterruption(notification: Notification) -> Void {

@@ -7,6 +7,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
   private var m_audioRecorder: AVAudioRecorder?
   private var m_path: String?
   private var m_stoppingIntentionally = false
+  private var m_interruptionObserver: NSObjectProtocol?
   private var m_onRecord: () -> ()
   private var m_onPause: () -> ()
   private var m_onStop: () -> ()
@@ -22,7 +23,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
   func start(config: RecordConfig, path: String) throws {
     try deleteFile(path: path)
 
-    try initAVAudioSession(config: config, manageAudioSession: m_manageAudioSession)
+    m_interruptionObserver = try initAVAudioSession(config: config, manageAudioSession: m_manageAudioSession)
 
     let url = URL(fileURLWithPath: path)
 
@@ -42,6 +43,11 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
   }
 
   func stop(completionHandler: @escaping (String?) -> ()) {
+    if let observer = m_interruptionObserver {
+      NotificationCenter.default.removeObserver(observer)
+      m_interruptionObserver = nil
+    }
+
     m_stoppingIntentionally = true
     m_audioRecorder?.stop()
     m_audioRecorder = nil
