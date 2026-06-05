@@ -6,17 +6,17 @@ import 'dart:js_interop';
 import 'encoder.dart';
 
 class PcmEncoder implements Encoder {
-  List<int> _dataViews = []; // Uint8List
+  final List<Uint8List> _chunks = [];
 
   @override
   void encode(Int16List buffer) {
-    _dataViews.addAll(buffer.buffer.asUint8List());
+    _chunks.add(buffer.buffer.asUint8List());
   }
 
   @override
   web.Blob finish() {
     final blob = web.Blob(
-      <JSUint8Array>[Uint8List.fromList(_dataViews).toJS].toJS,
+      _chunks.map((c) => c.toJS).toList().toJS,
       web.BlobPropertyBag(type: 'audio/pcm'),
     );
 
@@ -26,5 +26,5 @@ class PcmEncoder implements Encoder {
   }
 
   @override
-  void cleanup() => _dataViews = [];
+  void cleanup() => _chunks.clear();
 }
