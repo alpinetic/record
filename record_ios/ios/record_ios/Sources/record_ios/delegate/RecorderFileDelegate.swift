@@ -6,6 +6,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
 
   private var m_audioRecorder: AVAudioRecorder?
   private var m_path: String?
+  private var m_stoppingIntentionally = false
   private var m_onRecord: () -> ()
   private var m_onPause: () -> ()
   private var m_onStop: () -> ()
@@ -41,6 +42,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
   }
 
   func stop(completionHandler: @escaping (String?) -> ()) {
+    m_stoppingIntentionally = true
     m_audioRecorder?.stop()
     m_audioRecorder = nil
 
@@ -83,7 +85,12 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
   }
 
   func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-      // Audio recording has stopped
+    if m_stoppingIntentionally {
+      m_stoppingIntentionally = false
+      return
+    }
+    // System-terminated recording (disk full, audio route loss, etc.) — clean up state.
+    stop { _ in }
   }
   
   private func deleteFile(path: String) throws {
