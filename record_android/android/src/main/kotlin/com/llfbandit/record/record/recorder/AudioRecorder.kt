@@ -242,7 +242,7 @@ class AudioRecorder(
           AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
       )) {
         recorderThread?.pauseRecording()
-      } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN && config!!.audioInterruption == AudioInterruption.PAUSE_RESUME) {
+      } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN && config?.audioInterruption == AudioInterruption.PAUSE_RESUME) {
         recorderThread?.resumeRecording()
       }
     }
