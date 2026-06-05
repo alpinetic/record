@@ -191,31 +191,33 @@ class MediaRecorderDelegate extends RecorderDelegate {
   void _onStop() async {
     String? audioUrl;
 
-    if (_chunks.isNotEmpty) {
-      _elapsedTime.stop();
+    try {
+      if (_chunks.isNotEmpty) {
+        _elapsedTime.stop();
 
-      final blob = switch (_config!.encoder) {
-        AudioEncoder.opus => await fixWebmDuration(
-            web.Blob(
+        final blob = switch (_config!.encoder) {
+          AudioEncoder.opus => await fixWebmDuration(
+              web.Blob(
+                _chunks.toJS,
+                web.BlobPropertyBag(type: _mediaRecorder!.mimeType),
+              ),
+              _elapsedTime.elapsedMilliseconds.toJS,
+            ).toDart,
+          _ => web.Blob(
               _chunks.toJS,
               web.BlobPropertyBag(type: _mediaRecorder!.mimeType),
             ),
-            _elapsedTime.elapsedMilliseconds.toJS,
-          ).toDart,
-        _ => web.Blob(
-            _chunks.toJS,
-            web.BlobPropertyBag(type: _mediaRecorder!.mimeType),
-          ),
-      };
+        };
 
-      audioUrl = web.URL.createObjectURL(blob);
+        audioUrl = web.URL.createObjectURL(blob);
+      }
+    } catch (e) {
+      debugPrint(e.toString());
+    } finally {
+      await _reset();
+      onStateChanged(RecordState.stop);
+      _onStopCompleter?.complete(audioUrl);
     }
-
-    await _reset();
-
-    onStateChanged(RecordState.stop);
-
-    _onStopCompleter?.complete(audioUrl);
   }
 
   Future<void> _reset() async {
