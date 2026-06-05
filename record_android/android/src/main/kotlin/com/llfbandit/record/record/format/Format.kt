@@ -43,7 +43,7 @@ sealed class Format {
   }
 
   protected open fun adjustNumChannels(format: MediaFormat, numChannels: Int) {
-    format.setInteger(MediaFormat.KEY_CHANNEL_MASK, numChannels)
+    format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, numChannels)
   }
 
   /**
