@@ -418,13 +418,13 @@ namespace record_windows {
 			if (SUCCEEDED(hr))
 			{
 				devices.push_back(EncodableMap({
-				{EncodableValue("id"), EncodableValue(toString(id))},
-				{EncodableValue("label"), EncodableValue(toString(friendlyName))}
-					}));
-
-				CoTaskMemFree(id);
-				CoTaskMemFree(friendlyName);
+					{EncodableValue("id"), EncodableValue(toString(id))},
+					{EncodableValue("label"), EncodableValue(toString(friendlyName))}
+				}));
 			}
+
+			CoTaskMemFree(id);
+			CoTaskMemFree(friendlyName);
 		}
 
 		if (SUCCEEDED(hr))
