@@ -41,11 +41,9 @@ class MediaCodecEncoder(
 
     val s = Sample(bytes)
     mHandler?.post {
-      if (!mStopped) {
-        mQueue.add(s)
-        if (mInputBufferIndex >= 0) {
-          processInputBuffer()
-        }
+      mQueue.add(s)
+      if (mInputBufferIndex >= 0) {
+        processInputBuffer()
       }
     }
   }
