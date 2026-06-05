@@ -12,12 +12,14 @@ func listInputs() throws -> [Device] {
 
 func listInputDevices() throws -> [AVAudioSessionPortDescription]? {
   let audioSession = AVAudioSession.sharedInstance()
-  let options: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetooth]
 
-  do {
-    try audioSession.setCategory(.playAndRecord, options: options)
-  } catch {
-    throw RecorderError.error(message: "Failed to list inputs", details: "setCategory: \(error.localizedDescription)")
+  let inputCapableCategories: [AVAudioSession.Category] = [.record, .playAndRecord]
+  if !inputCapableCategories.contains(audioSession.category) {
+    do {
+      try audioSession.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetooth])
+    } catch {
+      throw RecorderError.error(message: "Failed to list inputs", details: "setCategory: \(error.localizedDescription)")
+    }
   }
 
   return audioSession.availableInputs
