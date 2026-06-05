@@ -37,6 +37,7 @@ namespace record_windows {
 	// static, Register the plugin
 	void RecordWindowsPlugin::RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar) {
 		auto plugin = std::make_unique<RecordWindowsPlugin>(
+			registrar->messenger(),
 			[registrar](auto delegate) {
 				return registrar->RegisterTopLevelWindowProcDelegate(delegate);
 			},
@@ -46,10 +47,8 @@ namespace record_windows {
 			[registrar] { return GetRootWindow(registrar->GetView()); }
 		);
 
-		m_binaryMessenger = registrar->messenger();
-
 		auto methodChannel = std::make_unique<MethodChannel<EncodableValue>>(
-			m_binaryMessenger, "com.llfbandit.record/messages",
+			registrar->messenger(), "com.llfbandit.record/messages",
 			&StandardMethodCodec::GetInstance());
 
 		methodChannel->SetMethodCallHandler(
@@ -81,10 +80,12 @@ namespace record_windows {
 	}
 
 	RecordWindowsPlugin::RecordWindowsPlugin(
+		BinaryMessenger* messenger,
 		WindowProcDelegateRegistrator registrator,
 		WindowProcDelegateUnregistrator unregistrator,
 		FlutterRootWindowProvider window_provider
-	):	m_win_proc_delegate_registrator(registrator),
+	):	m_binaryMessenger(messenger),
+		m_win_proc_delegate_registrator(registrator),
 		m_win_proc_delegate_unregistrator(unregistrator) {
 
 		get_root_window = std::move(window_provider);

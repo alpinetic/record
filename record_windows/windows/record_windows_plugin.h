@@ -39,6 +39,7 @@ namespace record_windows {
 		static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar);
 
 		RecordWindowsPlugin(
+			BinaryMessenger* messenger,
 			WindowProcDelegateRegistrator registrator,
 			WindowProcDelegateUnregistrator unregistrator,
 			FlutterRootWindowProvider window_provider
@@ -61,7 +62,7 @@ namespace record_windows {
 		static void RunOnMainThread(std::function<void()> callback);
 
 	private:
-		static inline BinaryMessenger* m_binaryMessenger;
+		BinaryMessenger* m_binaryMessenger;
 
 		// Called when a method is called on this plugin's channel from Dart.
 		void HandleMethodCall(const MethodCall<EncodableValue>& method_call,
