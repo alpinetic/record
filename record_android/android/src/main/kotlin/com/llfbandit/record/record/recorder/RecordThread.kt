@@ -71,10 +71,12 @@ class RecordThread(
   }
 
   fun cancelRecording() {
+    mHasBeenCanceled = true
+
     if (isRecording()) {
-      mHasBeenCanceled = true
       stopRecording()
-    } else {
+    } else if (mRecordThread == null) {
+      // Thread never started or has fully finished. stopAndRelease() won't run again.
       Utils.deleteFile(config.path)
     }
   }
