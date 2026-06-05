@@ -1,3 +1,13 @@
+## 2.0.1
+* fix: BinaryMessenger not shared.
+* fix: Correct HR result from ListInputDevices.
+* fix: Race condition on dispose/stop.
+* fix: Ensures that channels are only added if Recorder instance is created.
+* fix: Memory leak on ListInputDevices.
+* fix: Pause result is discarded.
+* fix: Wrong amplitude.
+* fix: Potential crash when streaming.
+
 ## 2.0.0
 * chore: Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
 
