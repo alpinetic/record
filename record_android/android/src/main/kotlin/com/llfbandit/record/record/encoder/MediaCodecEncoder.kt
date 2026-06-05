@@ -30,8 +30,8 @@ class MediaCodecEncoder(
   private var mContainerTrack = 0
 
   // Semaphore to signal the end of encoding
-  private var mStoppedCompleter: Semaphore? = null
-  private var mStopped = false
+  @Volatile private var mStoppedCompleter: Semaphore? = null
+  @Volatile private var mStopped = false
 
   override fun encode(bytes: ByteArray) {
     if (mStopped) {
@@ -62,8 +62,9 @@ class MediaCodecEncoder(
     mStopped = true
 
     val completer = Semaphore(0)
+    mStoppedCompleter = completer
+
     mHandler?.post {
-      mStoppedCompleter = completer
       if (mInputBufferIndex >= 0) {
         processInputBuffer()
       }
