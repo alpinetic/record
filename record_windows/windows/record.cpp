@@ -451,8 +451,8 @@ namespace record_windows
 		if (bytesPerSample == 2) { // PCM 16 bits
 			auto values = convertBytesToInt16(chunk, size);
 
-			for (DWORD i = 0; i < size; i++) {
-				int curSample = std::abs(values[i]);
+			for (auto v : values) {
+				int curSample = std::abs((int)v);
 				if (curSample > maxSample) {
 					maxSample = curSample;
 				}
@@ -483,14 +483,14 @@ namespace record_windows
 
 	std::vector<int16_t> Recorder::convertBytesToInt16(BYTE* bytes, DWORD size)
 	{
-		// Convert to int16
-		std::vector<int16_t> values(size / 2);
+		std::vector<int16_t> values;
+		values.reserve(size / 2);
 
 		int n = 1;
 		if (*(char*)&n == 1) {
 			// We're on little endian host
 			for (DWORD i = 0; i < size; i += 2) {
-				values.push_back(int16_t(bytes[i] << 0 | bytes[i + 1] << 8));
+				values.push_back(int16_t(bytes[i] | bytes[i + 1] << 8));
 			}
 		}
 		else {
