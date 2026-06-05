@@ -147,8 +147,12 @@ public class RecordIosPlugin: NSObject, FlutterPlugin {
   }
 
   private func handleStop(recorder: Recorder, result: @escaping FlutterResult) {
-    recorder.stop { path in
-      result(path)
+    m_recorderQueue.async {
+      recorder.stop { path in
+        DispatchQueue.main.async {
+          result(path)
+        }
+      }
     }
   }
 
