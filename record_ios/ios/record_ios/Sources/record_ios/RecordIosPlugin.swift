@@ -253,11 +253,11 @@ public class RecordIosPlugin: NSObject, FlutterPlugin {
 
   private func handleSetAudioSessionCategory(recorder: Recorder, args: [String: Any], result: @escaping FlutterResult) {
     guard let category = args["category"] as? String else {
-      result(FlutterError(code: "stt", message: "Call missing mandatory parameter category.", details: nil))
+      result(FlutterError(code: "record", message: "Call missing mandatory parameter category.", details: nil))
       return
     }
     guard let options = args["options"] as? [String] else {
-      result(FlutterError(code: "stt", message: "Call missing mandatory parameter options.", details: nil))
+      result(FlutterError(code: "record", message: "Call missing mandatory parameter options.", details: nil))
       return
     }
 
