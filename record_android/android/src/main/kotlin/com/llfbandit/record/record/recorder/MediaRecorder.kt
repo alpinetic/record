@@ -103,7 +103,8 @@ class MediaRecorder(
     var current = -160.0
 
     if (mIsRecording) {
-      current = 20 * log10(mRecorder!!.maxAmplitude / 32768.0)
+      val maxAmplitude = mRecorder!!.maxAmplitude
+      current = if (maxAmplitude == 0) -160.0 else 20 * log10(maxAmplitude / 32768.0)
 
       if (current > mMaxAmplitude) {
         mMaxAmplitude = current

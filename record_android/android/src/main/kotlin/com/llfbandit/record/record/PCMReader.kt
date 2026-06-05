@@ -180,6 +180,7 @@ class PCMReader(
 
   private fun calculateAmplitudeDb(size: Int): Double {
     val max = readBuffer.take(size).maxOf { abs(it.toInt()) }
+    if (max == 0) return DEFAULT_AMPLITUDE_DB
     return 0.0.coerceAtMost(20 * log10(max / MAX_PCM_VALUE))
   }
 
