@@ -70,8 +70,11 @@ namespace record_windows
 							if (m_recordEventHandler && !m_pWriter) {
 								std::vector<uint8_t> bytes(pChunk, pChunk + size);
 
-								RecordWindowsPlugin::RunOnMainThread([this, bytes]() -> void {
-									m_recordEventHandler->Success(std::make_unique<flutter::EncodableValue>(bytes));
+								EventStreamHandler<>* handlerPtr = m_recordEventHandler;
+								RecordWindowsPlugin::RunOnMainThread([handlerPtr, bytes]() -> void {
+									if (handlerPtr) {
+										handlerPtr->Success(std::make_unique<flutter::EncodableValue>(bytes));
+									}
 								});
 							}
 
