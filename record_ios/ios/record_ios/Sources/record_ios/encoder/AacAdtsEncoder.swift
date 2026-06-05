@@ -132,8 +132,8 @@ class AacAdtsEncoder: AudioEnc {
         mBuffers: inputBuffer
       )
       
-      // Prepare output buffer
-      let outputBufferSize = 2048
+      // AAC-LC allows up to 6144 bits/channel; 8192 bytes comfortably covers all.
+      let outputBufferSize = 8192
       let outputBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: outputBufferSize)
       defer { outputBuffer.deallocate() }
       
