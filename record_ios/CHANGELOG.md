@@ -1,3 +1,15 @@
+## 2.0.1
+fix: Wrong error code.
+fix: Don't override AVAudioSession.Category if there's no need for listing devices.
+fix: resume for file delegate fires consistent state.
+fix: Increases output buffer for aac encoder to prevent frame loss at high rates.
+fix: Potential crash in encodeAac.
+fix: handleStop bypassed m_recorderQueue.
+fix: Interruption observers accumulation.
+fix: audioRecorderDidFinishRecording has empty body, recorder can be stuck in .record on system error.
+fix: Race condition in AacAdtsEncoder.
+fix: stop() called from tap callback can cause deadlock.
+
 ## 2.0.0
 * fix: Respect `shouldResume` system flag on audio interruption and don't stop on resume failure.
 * chore: **Breaking change** Remove `manageAudioSession` deprecated config property.
