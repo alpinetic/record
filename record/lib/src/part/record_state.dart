@@ -18,10 +18,6 @@ mixin _StateMixin {
     OnStateChanged onStateChanged,
     Semaphore semaphore,
   ) {
-    if (_stateStreamCtrl case final ctrl?) {
-      return ctrl.stream;
-    }
-
     _stateStreamCtrl = StreamController<RecordState>.broadcast();
 
     semaphore.acquire().whenComplete(() {
