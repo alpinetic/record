@@ -16,6 +16,10 @@ mixin _AmplitudeMixin {
     _GetAmplitude getAmplitude,
   ) {
     if (_amplitudeStreamCtrl case final ctrl?) {
+      if (_amplitudeTimerInterval != interval) {
+        _amplitudeTimerInterval = interval;
+        _startAmplitudeMonitoring(isRecording, getAmplitude);
+      }
       return ctrl.stream;
     }
 
@@ -69,7 +73,9 @@ mixin _AmplitudeMixin {
 
     if (await shouldUpdate()) {
       final amplitude = await getAmplitude();
-      _amplitudeStreamCtrl?.add(amplitude);
+      if (_amplitudeStreamCtrl case final ctrl? when !ctrl.isClosed) {
+        ctrl.add(amplitude);
+      }
     }
   }
 }
