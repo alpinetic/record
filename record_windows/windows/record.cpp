@@ -273,6 +273,7 @@ namespace record_windows
 
 		m_amplitude = -160;
 		m_maxAmplitude = -160;
+		m_dataWritten = 0;
 
 		if (m_mfStarted)
 		{
