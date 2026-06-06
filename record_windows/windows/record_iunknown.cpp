@@ -1,3 +1,4 @@
+#include <shlwapi.h>
 #include "record.h"
 
 namespace record_windows

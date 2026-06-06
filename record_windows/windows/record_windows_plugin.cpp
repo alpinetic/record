@@ -1,4 +1,5 @@
 #include "record_windows_plugin.h"
+#include "record_audio_device.h"
 #include <mfreadwrite.h>
 #include <Mferror.h>
 #include "record_config.h"
@@ -119,7 +120,7 @@ namespace record_windows {
 	}
 
 	// Called when a method is called on this plugin's channel from Dart.
-	void RecordWindowsPlugin::RecordWindowsPlugin::HandleMethodCall(
+	void RecordWindowsPlugin::HandleMethodCall(
 		const MethodCall<EncodableValue>& method_call,
 		std::unique_ptr<MethodResult<EncodableValue>> result
 	) {
@@ -212,7 +213,7 @@ namespace record_windows {
 
 			if (SUCCEEDED(hr))
 			{
-				result->Success(recordingPath.empty() ? EncodableValue() : EncodableValue(Utf8FromUtf16(recordingPath)));
+				result->Success(recordingPath.empty() ? EncodableValue() : EncodableValue(Utf8FromUtf16(recordingPath.c_str())));
 			}
 			else {
 				ErrorFromHR(hr, *result);
@@ -271,7 +272,7 @@ namespace record_windows {
 			}
 
 			bool supported = false;
-			HRESULT hr = recorder->isEncoderSupported(encoderName, &supported);
+			HRESULT hr = AudioDevice::IsEncoderSupported(encoderName, &supported);
 
 			if (SUCCEEDED(hr))
 			{
@@ -284,7 +285,13 @@ namespace record_windows {
 		}
 		else if (method_call.method_name().compare("listInputDevices") == 0)
 		{
-			ListInputDevices(*result);
+			EncodableList devices;
+			HRESULT hr = AudioDevice::ListInputDevices(devices);
+			if (SUCCEEDED(hr)) {
+				result->Success(EncodableValue(std::move(devices)));
+			} else {
+				ErrorFromHR(hr, *result);
+			}
 		}
 	}
 
@@ -371,68 +378,4 @@ namespace record_windows {
 		return searchedRecorder->second.get();
 	}
 
-	HRESULT RecordWindowsPlugin::ListInputDevices(MethodResult<EncodableValue>& result)
-	{
-		EncodableList devices;
-
-		IMFAttributes* pDeviceAttributes = NULL;
-		IMFActivate** ppDevices = NULL;
-		UINT32 deviceCount = 0;
-
-		HRESULT hr = MFCreateAttributes(&pDeviceAttributes, 1);
-		if (SUCCEEDED(hr))
-		{
-			// Request audio capture devices
-			hr = pDeviceAttributes->SetGUID(
-				MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
-				MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID);
-		}
-
-		if (SUCCEEDED(hr))
-		{
-			hr = MFEnumDeviceSources(pDeviceAttributes, &ppDevices, &deviceCount);
-		}
-
-		for (UINT32 i = 0; i < deviceCount; i++)
-		{
-			LPWSTR friendlyName = NULL;
-			UINT32 friendlyNameLength = 0;
-			LPWSTR id = NULL;
-			UINT32 idLength = 0;
-
-			HRESULT deviceHr = ppDevices[i]->GetAllocatedString(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_ENDPOINT_ID, &id, &idLength);
-			if (SUCCEEDED(deviceHr))
-			{
-				deviceHr = ppDevices[i]->GetAllocatedString(MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &friendlyName, &friendlyNameLength);
-			}
-			if (SUCCEEDED(deviceHr))
-			{
-				devices.push_back(EncodableMap({
-					{EncodableValue("id"), EncodableValue(toString(id))},
-					{EncodableValue("label"), EncodableValue(toString(friendlyName))}
-				}));
-			}
-
-			CoTaskMemFree(id);
-			CoTaskMemFree(friendlyName);
-		}
-
-		if (SUCCEEDED(hr))
-		{
-			result.Success(std::move(EncodableValue(devices)));
-		}
-		else
-		{
-			ErrorFromHR(hr, result);
-		}
-
-		for (UINT32 i = 0; i < deviceCount; i++)
-		{
-			SafeRelease(ppDevices[i]);
-		}
-		SafeRelease(pDeviceAttributes);
-		CoTaskMemFree(ppDevices);
-
-		return hr;
-	}
 }  // namespace record_windows

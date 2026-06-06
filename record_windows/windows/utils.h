@@ -2,29 +2,9 @@
 
 #include <memory>
 #include <flutter/encodable_value.h>
-#include <flutter/method_channel.h>
 #include <tchar.h>
 #include <comdef.h>
 #include <system_error>
-
-using namespace flutter;
-
-//////////////////////////////////////////////////////////////////////////
-//  Flutter method arguments
-//////////////////////////////////////////////////////////////////////////
-template <typename T>
-T GetArgument(const std::string arg, const EncodableValue* args, T fallback) {
-	T result{ fallback };
-	const auto* arguments = std::get_if<EncodableMap>(args);
-	if (arguments) {
-		auto result_it = arguments->find(EncodableValue(arg));
-		if (result_it != arguments->end()) {
-			if (!result_it->second.IsNull())
-				result = std::get<T>(result_it->second);
-		}
-	}
-	return result;
-}
 
 template <typename T>
 static bool GetValueFromEncodableMap(const flutter::EncodableMap* map,
@@ -61,57 +41,53 @@ template <class T> inline void SafeRelease(T*& pT)
 	}
 }
 
-inline std::string toString(LPCWSTR pwsz) {
-	int cch = WideCharToMultiByte(CP_UTF8, 0, pwsz, -1, 0, 0, NULL, NULL);
+inline std::string Utf8FromUtf16(const wchar_t* utf16_string) {
+	if (!utf16_string) return {};
 
-	char* psz = new char[cch];
+	int len = static_cast<int>(wcslen(utf16_string));
+	if (len == 0) return {};
 
-	WideCharToMultiByte(CP_UTF8, 0, pwsz, -1, psz, cch, NULL, NULL);
+	int target_length = ::WideCharToMultiByte(
+		CP_UTF8, WC_ERR_INVALID_CHARS,
+		utf16_string, len,
+		nullptr, 0,
+		nullptr, nullptr
+	);
+	if (target_length == 0) return {};
 
-	std::string st(psz);
-	delete[] psz;
+	std::string result(target_length, '\0');
 
-	return st;
+	::WideCharToMultiByte(
+		CP_UTF8, WC_ERR_INVALID_CHARS,
+		utf16_string, len,
+		result.data(), target_length,
+		nullptr, nullptr
+	);
+
+	return result;
 }
 
-inline std::string Utf8FromUtf16(const std::wstring& utf16_string) {
-	if (utf16_string.empty()) {
-		return std::string();
-	}
-	int target_length = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, utf16_string.data(), static_cast<int>(utf16_string.length()), nullptr, 0, nullptr, nullptr);
-
-	std::string utf8_string;
-	if (target_length == 0 || target_length > utf8_string.max_size()) {
-		return utf8_string;
-	}
-
-	utf8_string.resize(target_length);
-	int converted_length = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, utf16_string.data(), static_cast<int>(utf16_string.length()), utf8_string.data(), target_length, nullptr, nullptr);
-	if (converted_length == 0) {
-		return std::string();
-	}
-
-	return utf8_string;
-}
 
 inline std::wstring Utf16FromUtf8(const std::string& utf8_string) {
-	if (utf8_string.empty()) {
-		return std::wstring();
-	}
+	if (utf8_string.empty()) return {};
 
-	int target_length = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_string.data(), static_cast<int>(utf8_string.length()), nullptr, 0);
-	std::wstring utf16_string;
-	if (target_length == 0 || target_length > utf16_string.max_size()) {
-		return utf16_string;
-	}
+	int len = static_cast<int>(utf8_string.length());
+	int target_length = ::MultiByteToWideChar(
+		CP_UTF8, MB_ERR_INVALID_CHARS,
+		utf8_string.data(), len,
+		nullptr, 0
+	);
+	if (target_length == 0) return {};
 
-	utf16_string.resize(target_length);
-	int converted_length = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_string.data(), static_cast<int>(utf8_string.length()), utf16_string.data(), target_length);
-	if (converted_length == 0) {
-		return std::wstring();
-	}
+	std::wstring result(target_length, L'\0');
 
-	return utf16_string;
+	::MultiByteToWideChar(
+		CP_UTF8, MB_ERR_INVALID_CHARS,
+		utf8_string.data(), len,
+		result.data(), target_length
+	);
+
+	return result;
 }
 
 
@@ -149,7 +125,7 @@ public:
 
 //////////////////////////////////////////////////////////////////////////
 //  AutoLock
-//  Description: Provides automatic locking and unlocking of a 
+//  Description: Provides automatic locking and unlocking of a
 //               of a critical section.
 //
 //  Note: The AutoLock object must go out of scope before the CritSec.

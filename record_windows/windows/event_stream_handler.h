@@ -1,10 +1,8 @@
 #include <flutter/event_channel.h>
 #include <flutter/encodable_value.h>
 
-using namespace flutter;
-
-template <typename T = EncodableValue>
-class EventStreamHandler : public StreamHandler<T> {
+template <typename T = flutter::EncodableValue>
+class EventStreamHandler : public flutter::StreamHandler<T> {
 public:
     EventStreamHandler() = default;
 
@@ -24,18 +22,18 @@ public:
     }
 
 protected:
-    std::unique_ptr<StreamHandlerError<T>> OnListenInternal(
-        const T* arguments, std::unique_ptr<EventSink<T>>&& events) override {
+    std::unique_ptr<flutter::StreamHandlerError<T>> OnListenInternal(
+        const T* arguments, std::unique_ptr<flutter::EventSink<T>>&& events) override {
         m_sink = std::move(events);
         return nullptr;
     }
 
-    std::unique_ptr<StreamHandlerError<T>> OnCancelInternal(
+    std::unique_ptr<flutter::StreamHandlerError<T>> OnCancelInternal(
         const T* arguments) override {
         m_sink.reset();
         return nullptr;
     }
 
 private:
-    std::unique_ptr<EventSink<T>> m_sink;
+    std::unique_ptr<flutter::EventSink<T>> m_sink;
 };

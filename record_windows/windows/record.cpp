@@ -1,4 +1,6 @@
 #include "record.h"
+#include "record_audio_device.h"
+#include "record_mediatype.h"
 #include "record_windows_plugin.h"
 
 namespace record_windows
@@ -42,7 +44,7 @@ namespace record_windows
 	HRESULT Recorder::Start(std::unique_ptr<RecordConfig> config, std::wstring path)
 	{
 		bool supported = false;
-		HRESULT hr = isEncoderSupported(config->encoderName, &supported);
+		HRESULT hr = AudioDevice::IsEncoderSupported(config->encoderName, &supported);
 
 		if (FAILED(hr) || !supported)
 		{
@@ -78,7 +80,7 @@ namespace record_windows
 
 	HRESULT Recorder::StartStream(std::unique_ptr<RecordConfig> config)
 	{
-		if (config->encoderName != AudioEncoder().pcm16bits)
+		if (config->encoderName != AudioEncoder::pcm16bits)
 		{
 			return E_NOTIMPL;
 		}
@@ -263,16 +265,15 @@ namespace record_windows
 			hr = m_pWriter->Finalize();
 		}
 
-		if (m_pConfig && m_pConfig->encoderName == AudioEncoder().wav) {
-			FillWavHeader();
+		if (m_pConfig && m_pConfig->encoderName == AudioEncoder::wav) {
+			MediaType::FillWavHeader(m_recordingPath, m_pMediaType, m_dataWritten);
 		}
 
 		m_bFirstSample = true;
 		m_llBaseTime = 0;
 		m_llLastTime = 0;
 
-		m_amplitude = -160;
-		m_maxAmplitude = -160;
+		m_amplitude.reset();
 		m_dataWritten = 0;
 
 		if (m_mfStarted)
@@ -313,9 +314,7 @@ namespace record_windows
 			// mirrors previous behavior with a quick null check on the main thread.
 			EventStreamHandler<>* handlerPtr = m_stateEventHandler;
 			RecordWindowsPlugin::RunOnMainThread([handlerPtr, state]() -> void {
-				if (handlerPtr) {
-					handlerPtr->Success(std::make_unique<flutter::EncodableValue>(state));
-				}
+				handlerPtr->Success(std::make_unique<flutter::EncodableValue>(state));
 			});
 		}
 	}
@@ -376,7 +375,7 @@ namespace record_windows
 		}
 		if (SUCCEEDED(hr))
 		{
-			hr = CreateAudioProfileIn(&pMediaTypeIn);
+			hr = MediaType::CreateInputProfile(*m_pConfig, &pMediaTypeIn);
 		}
 		if (SUCCEEDED(hr))
 		{
@@ -400,7 +399,7 @@ namespace record_windows
 		// Set the output media type.
 		if (SUCCEEDED(hr))
 		{
-			hr = CreateAudioProfileOut(&pMediaTypeOut);
+			hr = MediaType::CreateOutputProfile(*m_pConfig, &pMediaTypeOut);
 		}
 		if (SUCCEEDED(hr))
 		{
@@ -441,40 +440,9 @@ namespace record_windows
 	std::map<std::string, double> Recorder::GetAmplitude()
 	{
 		return {
-			{"current", m_amplitude},
-			{"max" , m_maxAmplitude},
+			{"current", m_amplitude.current},
+			{"max"    , m_amplitude.peak},
 		};
-	}
-
-	void Recorder::GetAmplitude(BYTE* chunk, DWORD size, int bytesPerSample) {
-		int maxSample = -160;
-
-		if (bytesPerSample == 2) { // PCM 16 bits
-			auto values = convertBytesToInt16(chunk, size);
-
-			for (auto v : values) {
-				int curSample = std::abs((int)v);
-				if (curSample > maxSample) {
-					maxSample = curSample;
-				}
-			}
-
-			m_amplitude = 20 * std::log10(maxSample / 32767.0); // 16 signed bits 2^15 - 1
-		}
-		else /* if (bytesPerSample == 1) */ { // PCM 8 bits
-			for (DWORD i = 0; i < size; i++) {
-				byte curSample = chunk[i];
-				if (curSample > maxSample) {
-					maxSample = curSample;
-				}
-			}
-
-			m_amplitude = 20 * std::log10(maxSample / 256.0); // 8 unsigned bits 2^8
-		}
-
-		if (m_amplitude > m_maxAmplitude) {
-			m_maxAmplitude = m_amplitude;
-		}
 	}
 
 	std::wstring Recorder::GetRecordingPath()
@@ -482,79 +450,4 @@ namespace record_windows
 		return m_recordingPath;
 	}
 
-	std::vector<int16_t> Recorder::convertBytesToInt16(BYTE* bytes, DWORD size)
-	{
-		std::vector<int16_t> values;
-		values.reserve(size / 2);
-
-		int n = 1;
-		if (*(char*)&n == 1) {
-			// We're on little endian host
-			for (DWORD i = 0; i < size; i += 2) {
-				values.push_back(int16_t(bytes[i] | bytes[i + 1] << 8));
-			}
-		}
-		else {
-			// We're on big endian host
-			for (DWORD i = 0; i < size; i += 2) {
-				values.push_back(int16_t(bytes[i + 1] | bytes[i] << 8));
-			}
-		}
-
-		return values;
-	}
-
-	HRESULT Recorder::isEncoderSupported(const std::string encoderName, bool* supported)
-	{
-		MFT_REGISTER_TYPE_INFO typeLookup = {};
-		typeLookup.guidMajorType = MFMediaType_Audio;
-
-		if (encoderName == AudioEncoder().aacLc) typeLookup.guidSubtype = MFAudioFormat_AAC;
-		/*else if (encoderName == AudioEncoder().aacEld) typeLookup.guidSubtype = MFAudioFormat_AAC;
-		else if (encoderName == AudioEncoder().aacHe) typeLookup.guidSubtype = MFAudioFormat_AAC;*/
-		else if (encoderName == AudioEncoder().amrNb) typeLookup.guidSubtype = MFAudioFormat_AMR_NB;
-		else if (encoderName == AudioEncoder().amrWb) typeLookup.guidSubtype = MFAudioFormat_AMR_WB;
-		else if (encoderName == AudioEncoder().opus) typeLookup.guidSubtype = MFAudioFormat_Opus;
-		else if (encoderName == AudioEncoder().flac) typeLookup.guidSubtype = MFAudioFormat_FLAC;
-		else if (encoderName == AudioEncoder().pcm16bits || encoderName == AudioEncoder().wav) {
-			*supported = true;
-			return S_OK;
-		}
-		else {
-			*supported = false;
-			return S_OK;
-		}
-
-		// Enumerate all codecs except for codecs with field-of-use restrictions.
-		// Sort the results.
-		DWORD dwFlags =
-			(MFT_ENUM_FLAG_ALL & (~MFT_ENUM_FLAG_FIELDOFUSE)) |
-			MFT_ENUM_FLAG_SORTANDFILTER;
-
-		IMFActivate** ppMFTActivate = NULL;		// array of IMFActivate interface pointers
-		UINT32 numMFTActivate;
-
-		// Gets a list of output formats from an audio encoder.
-		HRESULT hr = MFTEnumEx(
-			MFT_CATEGORY_AUDIO_ENCODER,
-			dwFlags,
-			NULL,
-			&typeLookup,
-			&ppMFTActivate,
-			&numMFTActivate
-		);
-
-		if (SUCCEEDED(hr))
-		{
-			*supported = numMFTActivate != 0;
-		}
-
-		for (UINT32 i = 0; i < numMFTActivate; i++)
-		{
-			SafeRelease(ppMFTActivate[i]);
-		}
-		CoTaskMemFree(ppMFTActivate);
-
-		return hr;
-	}
 };

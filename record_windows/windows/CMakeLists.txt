@@ -21,7 +21,12 @@ list(APPEND PLUGIN_SOURCES
   "record.cpp"
   "record_readercallback.cpp"
   "record_iunknown.cpp"
+  "record_mediatype.h"
   "record_mediatype.cpp"
+  "record_audio_device.h"
+  "record_audio_device.cpp"
+  "amplitude_tracker.h"
+  "amplitude_tracker.cpp"
   "utils.h"
   "event_stream_handler.h"
 )
@@ -34,7 +39,7 @@ add_library(${PLUGIN_NAME} SHARED
   ${PLUGIN_SOURCES}
 )
 
-set(wmf_libs dxva2.lib evr.lib mf.lib mfplat.lib mfplay.lib mfreadwrite.lib mfuuid.lib Shlwapi.lib)
+set(wmf_libs mf.lib mfplat.lib mfreadwrite.lib mfuuid.lib Shlwapi.lib)
 
 # Apply a standard set of build settings that are configured in the
 # application-level CMakeLists.txt. This can be removed for plugins that want

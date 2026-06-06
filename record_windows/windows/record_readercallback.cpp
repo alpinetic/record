@@ -72,13 +72,11 @@ namespace record_windows
 
 								EventStreamHandler<>* handlerPtr = m_recordEventHandler;
 								RecordWindowsPlugin::RunOnMainThread([handlerPtr, bytes]() -> void {
-									if (handlerPtr) {
-										handlerPtr->Success(std::make_unique<flutter::EncodableValue>(bytes));
-									}
+									handlerPtr->Success(std::make_unique<flutter::EncodableValue>(bytes));
 								});
 							}
 
-							GetAmplitude(pChunk, size, 2);
+							m_amplitude.update(pChunk, size);
 
 							pBuffer->Unlock();
 						}
