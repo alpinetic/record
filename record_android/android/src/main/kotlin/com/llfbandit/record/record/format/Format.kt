@@ -108,10 +108,7 @@ sealed class Format {
         }
         adjustNumChannels(
           mediaFormat,
-          nearestValue(
-            intArrayOf(1, audioCapabilities.maxInputChannelCount),
-            config.numChannels
-          )
+          checkBounds(Range(1, audioCapabilities.maxInputChannelCount), config.numChannels)
         )
       }
 

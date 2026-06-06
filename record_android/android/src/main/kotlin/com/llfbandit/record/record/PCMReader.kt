@@ -120,11 +120,14 @@ class PCMReader(
   private fun getAudioFormat(): Int = AudioFormat.ENCODING_PCM_16BIT
 
   private fun getChannelsConfig(): Int {
-    return if (mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) == 1) {
-      AudioFormat.CHANNEL_IN_MONO
-    } else {
-      AudioFormat.CHANNEL_IN_STEREO
+    var numChannels = mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+
+    val channelCounts = config.device?.channelCounts
+    if (channelCounts != null && channelCounts.isNotEmpty()) {
+      numChannels = channelCounts.minBy { abs(it - numChannels) }
     }
+
+    return if (numChannels == 1) AudioFormat.CHANNEL_IN_MONO else AudioFormat.CHANNEL_IN_STEREO
   }
 
   private fun convertToByteArray(size: Int): ByteArray {
