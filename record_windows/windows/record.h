@@ -65,6 +65,7 @@ namespace record_windows
 		HRESULT CreateACCProfile( IMFMediaType* pMediaType);
 		HRESULT CreateFlacProfile( IMFMediaType* pMediaType);
 		HRESULT CreateAmrNbProfile( IMFMediaType* pMediaType);
+		HRESULT CreateAmrWbProfile( IMFMediaType* pMediaType);
 		HRESULT CreatePcmProfile( IMFMediaType* pMediaType);
 		HRESULT FillWavHeader();
 

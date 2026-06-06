@@ -67,7 +67,7 @@ namespace record_windows
 			else if (m_pConfig->encoderName == "aacEld") hr = CreateACCProfile(pMediaType);
 			else if (m_pConfig->encoderName == "aacHe") hr = CreateACCProfile(pMediaType);
 			else if (m_pConfig->encoderName == "amrNb") hr = CreateAmrNbProfile(pMediaType);
-			else if (m_pConfig->encoderName == "amrWb") hr = CreateAmrNbProfile(pMediaType);
+			else if (m_pConfig->encoderName == "amrWb") hr = CreateAmrWbProfile(pMediaType);
 			else if (m_pConfig->encoderName == "flac") hr = CreateFlacProfile(pMediaType);
 			else if (m_pConfig->encoderName == "pcm16bits") hr = CreatePcmProfile(pMediaType);
 			else if (m_pConfig->encoderName == "wav") hr = CreatePcmProfile(pMediaType);
@@ -157,6 +157,18 @@ namespace record_windows
 			// bitRates = { 4750, 5150, 5900, 6700, 7400, 7950, 10200, 12200 };
 
 			// hr = pMediaType->SetUINT32(MF_MT_AVG_BITRATE, config.bitRate);
+		}
+
+		return hr;
+	}
+
+	HRESULT Recorder::CreateAmrWbProfile(IMFMediaType* pMediaType)
+	{
+		HRESULT hr = pMediaType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AMR_WB);
+
+		if (SUCCEEDED(hr))
+		{
+			hr = pMediaType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
 		}
 
 		return hr;
