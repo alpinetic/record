@@ -7,6 +7,11 @@
 * fix: Pause result is discarded.
 * fix: Wrong amplitude.
 * fix: Potential crash when streaming.
+* fix: Various code style improvements.
+* fix: Remove dead code.
+* fix: Only set config if EndRecording succeeded.
+* fix: Let MFTEnumEx check if AMR_WB is available as encoder.
+
 
 ## 2.0.0
 * chore: Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
