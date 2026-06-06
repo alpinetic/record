@@ -1,3 +1,13 @@
+## 2.0.1
+* fix: Amplitude calculation.
+* fix: WEBM duration fixer is now fully written in Dart.
+* fix: Wait for proper pause/resume before updating state.
+* fix: Potential drop of messages.
+* fix: WAVE and PCM memory issues.
+* fix: worklet artifacts.
+* fix: permissions.query may not be supported on all browsers.
+* fix: Ensures to properly stop when fixWebmDuration throws.
+
 ## 2.0.0
 * feat: JS assets are now web platform-specific assets. No more js files in other platform builds.
 * chore: Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
