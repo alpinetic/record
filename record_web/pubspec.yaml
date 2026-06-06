@@ -32,5 +32,3 @@ flutter:
   assets:
     - path: assets/js/record.worklet.js
       platforms: [web]
-    - path: assets/js/record.fixwebmduration.js
-      platforms: [web]
