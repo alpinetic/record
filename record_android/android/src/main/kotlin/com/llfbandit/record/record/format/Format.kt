@@ -1,7 +1,6 @@
 package com.llfbandit.record.record.format
 
 import android.media.MediaCodecInfo
-import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.util.Log
 import android.util.Range
@@ -62,10 +61,10 @@ sealed class Format {
         mediaFormat
       )
     } else {
-      val codec = findCodecForAdjustedFormat(config, mediaFormat)
-      codec ?: throw Exception(
-        "No codec found for given config $mediaFormat. You should try with other values."
-      )
+      val codec = CodecSelector.findCodec(this, config, mediaFormat)
+        ?: throw Exception(
+          "No codec found for given config $mediaFormat. You should try with other values."
+        )
 
       Pair(
         MediaCodecEncoder(config, this, mediaFormat, listener, codec),
@@ -79,38 +78,13 @@ sealed class Format {
    *
    * @param path The output path if the container writes to file.
    */
-  abstract fun getContainer(path: String?): IContainerWriter
+  abstract fun createWriter(path: String?): IContainerWriter
 
-  protected fun nearestValue(values: IntArray, value: Int): Int {
-    var distance: Int = abs(values[0] - value)
-    var idx = 0
-
-    for (c in 1 until values.size) {
-      val cDistance = abs(values[c] - value)
-      if (cDistance < distance) {
-        idx = c
-        distance = cDistance
-      }
-    }
-
-    if (value != values[idx]) {
-      Log.d(TAG, "Available values: ${values.indices.map { values[it] }}")
-      Log.d(TAG, "Adjusted to: ${values[idx]}")
-    }
-
-    return values[idx]
-  }
-
-  private fun checkBounds(range: Range<Int>, value: Int): Int {
-    if (range.lower > value) {
-      return range.lower
-    } else if (range.upper < value) {
-      return range.upper
-    }
-    return value
-  }
-
-  private fun adjustFormat(
+  /**
+   * Attempts to adjust [mediaFormat] to fit within [caps], using format-specific hook methods.
+   * Returns true if the format is supported after adjustment.
+   */
+  internal fun adjustToCapabilities(
     caps: MediaCodecInfo.CodecCapabilities,
     config: RecordConfig,
     mediaFormat: MediaFormat
@@ -147,28 +121,33 @@ sealed class Format {
     return true
   }
 
-  private fun findCodecForAdjustedFormat(
-    config: RecordConfig,
-    mediaFormat: MediaFormat
-  ): String? {
-    val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+  protected fun nearestValue(values: IntArray, value: Int): Int {
+    var distance: Int = abs(values[0] - value)
+    var idx = 0
 
-    for (info in codecs.codecInfos) {
-      if (!info.isEncoder) {
-        continue
-      }
-
-      try {
-        val caps = info.getCapabilitiesForType(mimeTypeAudio)
-        if (caps != null && adjustFormat(caps, config, mediaFormat)) {
-          return info.name
-        }
-      } catch (_: IllegalArgumentException) {
-        // type is not supported
+    for (c in 1 until values.size) {
+      val cDistance = abs(values[c] - value)
+      if (cDistance < distance) {
+        idx = c
+        distance = cDistance
       }
     }
 
-    return null
+    if (value != values[idx]) {
+      Log.d(TAG, "Available values: ${values.indices.map { values[it] }}")
+      Log.d(TAG, "Adjusted to: ${values[idx]}")
+    }
+
+    return values[idx]
+  }
+
+  private fun checkBounds(range: Range<Int>, value: Int): Int {
+    if (range.lower > value) {
+      return range.lower
+    } else if (range.upper < value) {
+      return range.upper
+    }
+    return value
   }
 
   companion object {

@@ -24,7 +24,7 @@ class PcmFormat : Format() {
   }
 
 
-  override fun getContainer(path: String?): IContainerWriter {
+  override fun createWriter(path: String?): IContainerWriter {
     return RawContainer(path)
   }
 }

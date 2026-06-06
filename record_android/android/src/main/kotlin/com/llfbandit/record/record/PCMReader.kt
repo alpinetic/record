@@ -4,9 +4,6 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaFormat
-import android.media.audiofx.AcousticEchoCanceler
-import android.media.audiofx.AutomaticGainControl
-import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -23,24 +20,13 @@ class PCMReader(
     private const val MAX_PCM_VALUE = 32767.0 // 2^15 - 1 for 16-bit signed
   }
 
-  // Reusable buffer
   private val bufferSize: Int = initBufferSize()
   private val readBuffer: ShortArray = ShortArray(bufferSize / 2)
-
-  // Recorder & features
   private val reader: AudioRecord = createReader()
-  private var automaticGainControl: AutomaticGainControl? = null
-  private var acousticEchoCanceler: AcousticEchoCanceler? = null
-  private var noiseSuppressor: NoiseSuppressor? = null
+  private val effects: AudioEffectsManager =
+    AudioEffectsManager(reader.audioSessionId).also { it.apply(config) }
 
-  // Last acquired amplitude (in dB)
   private var amplitudeDb: Double = DEFAULT_AMPLITUDE_DB
-
-  init {
-    enableAutomaticGainControl()
-    enableEchoSuppressor()
-    enableNoiseSuppressor()
-  }
 
   fun start() {
     reader.startRecording()
@@ -74,9 +60,7 @@ class PCMReader(
 
   fun release() {
     stop()
-    automaticGainControl?.release()
-    acousticEchoCanceler?.release()
-    noiseSuppressor?.release()
+    effects.release()
     reader.release()
   }
 
@@ -140,33 +124,6 @@ class PCMReader(
       AudioFormat.CHANNEL_IN_MONO
     } else {
       AudioFormat.CHANNEL_IN_STEREO
-    }
-  }
-
-  private fun enableAutomaticGainControl() {
-    if (AutomaticGainControl.isAvailable()) {
-      automaticGainControl = AutomaticGainControl.create(reader.audioSessionId)
-      automaticGainControl?.enabled = config.autoGain
-    } else if (config.autoGain) {
-      Log.d(TAG, "Auto gain effect is not available.")
-    }
-  }
-
-  private fun enableNoiseSuppressor() {
-    if (NoiseSuppressor.isAvailable()) {
-      noiseSuppressor = NoiseSuppressor.create(reader.audioSessionId)
-      noiseSuppressor?.enabled = config.noiseSuppress
-    } else if (config.noiseSuppress) {
-      Log.d(TAG, "Noise suppressor effect is not available.")
-    }
-  }
-
-  private fun enableEchoSuppressor() {
-    if (AcousticEchoCanceler.isAvailable()) {
-      acousticEchoCanceler = AcousticEchoCanceler.create(reader.audioSessionId)
-      acousticEchoCanceler?.enabled = config.echoCancel
-    } else if (config.echoCancel) {
-      Log.d(TAG, "Echo canceler effect is not available.")
     }
   }
 

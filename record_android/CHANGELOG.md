@@ -14,6 +14,7 @@
 * fix: Encoding may not be stopped if PCM reader fails to stop.
 * fix: Wrong channel count adjustment.
 * fix: Race condition. BUFFER_FLAG_END_OF_STREAM never queued if last encode() runs before mStoppedCompleter is assigned.
+* fix: Code style improvements.
 
 
 ## 2.0.1

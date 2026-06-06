@@ -61,7 +61,7 @@ class AacFormat : Format() {
     this.numChannels = numChannels
   }
 
-  override fun getContainer(path: String?): IContainerWriter {
+  override fun createWriter(path: String?): IContainerWriter {
     if (path == null) {
       if (aacProfile != MediaCodecInfo.CodecProfileLevel.AACObjectLC) {
         throw IllegalArgumentException("Stream is not supported.")

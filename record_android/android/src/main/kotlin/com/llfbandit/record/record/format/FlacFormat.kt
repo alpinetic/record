@@ -27,7 +27,7 @@ class FlacFormat : Format() {
     return format
   }
 
-  override fun getContainer(path: String?): IContainerWriter {
+  override fun createWriter(path: String?): IContainerWriter {
     if (path == null) {
       throw IllegalArgumentException("Path not provided. Stream is not supported.")
     }
