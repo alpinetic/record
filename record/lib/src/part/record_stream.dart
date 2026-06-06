@@ -14,6 +14,11 @@ mixin _StreamMixin {
           ctrl.add(data);
         }
       },
+      onError: (Object error, StackTrace stackTrace) {
+        if (_recordStreamCtrl case final ctrl? when ctrl.hasListener) {
+          ctrl.addError(error, stackTrace);
+        }
+      },
     );
 
     return _recordStreamCtrl!.stream;
