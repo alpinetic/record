@@ -1,3 +1,12 @@
+## 7.0.1
+fix: Handles AudioRecorder initialization error.
+fix: Semaphore issues.
+fix: Amplitude interval change not taken into account.
+fix: Amplitude stream potential StateError.
+fix: Record stream doesn't propagate errors from platform.
+fix: Nullify subscriptions when disposing.
+chore: Add tests.
+
 ## 7.0.0
 * chore: Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
 * Android:
