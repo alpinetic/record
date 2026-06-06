@@ -19,17 +19,23 @@ class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
   // Semaphore to ensure sequential calls to platform.
   final _semaphore = Semaphore();
 
+  // A future to store potential error during initialization.
+  late final Future<void> _createFuture;
+
   Stream<RecordState>? _recordStateStream;
 
   RecordPlatform get _platform => RecordPlatform.instance;
 
   /// Creates a new audio recorder.
   AudioRecorder() : _recorderId = UuidV4.generate() {
-    _semaphore.acquire().whenComplete(
-      () => _platform
-          .create(_recorderId)
-          .whenComplete(() => _semaphore.release()),
-    );
+    _createFuture = () async {
+      await _semaphore.acquire();
+      try {
+        await _platform.create(_recorderId);
+      } finally {
+        _semaphore.release();
+      }
+    }();
   }
 
   /// Starts new recording session.
@@ -188,6 +194,7 @@ class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
 
   /// Safe call to [fn] with semaphore permit.
   Future<T> _safeCall<T>(Future<T> Function() fn) async {
+    await _createFuture;
     await _semaphore.acquire();
     try {
       return await fn();
