@@ -109,10 +109,10 @@ namespace record_windows
 	{
 		HRESULT hr = EndRecording();
 
-		m_pConfig = std::move(config);
-
 		if (SUCCEEDED(hr))
 		{
+			m_pConfig = std::move(config);
+
 			if (!m_mfStarted)
 			{
 				hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
