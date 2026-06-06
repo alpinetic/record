@@ -1,4 +1,5 @@
 ## 2.0.2
+* fix: Bluetooth SCO connection before audio recording.
 * fix: Prevents potential double pause event.
 * fix: Potential two stop events fired.
 * fix: Prevents potential NPE.

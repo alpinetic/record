@@ -7,11 +7,13 @@ import android.content.IntentFilter
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
 import com.llfbandit.record.record.device.DeviceUtils
 
 interface BluetoothScoListener {
   fun onBlScoConnected()
   fun onBlScoDisconnected()
+  fun onBlScoNone()
 }
 
 class BluetoothReceiver(
@@ -20,7 +22,7 @@ class BluetoothReceiver(
   private val filter = IntentFilter()
   private val audioManager: AudioManager =
     context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-  private val listeners = HashSet<BluetoothScoListener>()
+  private var listener: BluetoothScoListener? = null
   private val devices = HashSet<AudioDeviceInfo>()
   private var audioDeviceCallback: AudioDeviceCallback? = null
   private var mRegistered: Boolean = false
@@ -29,24 +31,15 @@ class BluetoothReceiver(
     filter.addAction(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)
   }
 
-  fun hasListeners(): Boolean {
-    return listeners.isNotEmpty()
-  }
-
-  fun register() {
+  fun register(listener: BluetoothScoListener) {
     context.registerReceiver(this, filter)
     mRegistered = true
+
+    this.listener = listener
 
     audioDeviceCallback = object : AudioDeviceCallback() {
       override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
         devices.addAll(DeviceUtils.filterSources(addedDevices.asList()))
-
-        val hasBluetoothSco = devices.any {
-          it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-        }
-        if (hasBluetoothSco) {
-          startBluetooth()
-        }
       }
 
       override fun onAudioDevicesRemoved(removedDevices: Array<AudioDeviceInfo>) {
@@ -55,24 +48,32 @@ class BluetoothReceiver(
         val hasBluetoothSco = devices.any {
           it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
         }
-        if (!hasBluetoothSco) {
-          stopBluetooth()
+        if (!hasBluetoothSco && audioManager.isBluetoothScoAvailableOffCall) {
+          stopBluetoothSco()
         }
       }
     }
 
     audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
+
+    // Handle devices that were already connected before the callback was registered.
+    devices.addAll(
+      DeviceUtils.filterSources(
+        audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).asList()
+      )
+    )
+    maybeStartOrNotify(listener)
   }
 
   fun unregister() {
-    stopBluetooth()
+    stopBluetoothSco()
 
     if (audioDeviceCallback != null) {
       audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
       audioDeviceCallback = null
     }
 
-    listeners.clear()
+    listener = null
 
     if (mRegistered) {
       context.unregisterReceiver(this)
@@ -80,40 +81,56 @@ class BluetoothReceiver(
     }
   }
 
-  fun addListener(listener: BluetoothScoListener) {
-    listeners.add(listener)
-  }
-
-  fun removeListener(listener: BluetoothScoListener) {
-    listeners.remove(listener)
+  private fun maybeStartOrNotify(listener: BluetoothScoListener) {
+    val hasBluetoothSco = devices.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+    if (hasBluetoothSco && audioManager.isBluetoothScoAvailableOffCall) {
+      startBluetoothSco(listener)
+    } else {
+      listener.onBlScoNone()
+    }
   }
 
   override fun onReceive(context: Context, intent: Intent) {
     val state = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, -1)
     when (state) {
-      AudioManager.SCO_AUDIO_STATE_CONNECTED -> listeners.forEach { it.onBlScoConnected() }
-      AudioManager.SCO_AUDIO_STATE_DISCONNECTED -> listeners.forEach { it.onBlScoDisconnected() }
+      AudioManager.SCO_AUDIO_STATE_CONNECTED -> listener?.onBlScoConnected()
+      AudioManager.SCO_AUDIO_STATE_DISCONNECTED -> listener?.onBlScoDisconnected()
     }
   }
 
-  @Suppress("DEPRECATION")
-  fun startBluetooth(): Boolean {
+  private fun startBluetoothSco(listener: BluetoothScoListener? = this.listener) {
     if (!audioManager.isBluetoothScoAvailableOffCall) {
-      return false
+      return
     }
 
-    if (!audioManager.isBluetoothScoOn()) {
-      audioManager.startBluetoothSco()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      for (device in audioManager.availableCommunicationDevices) {
+        if (device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
+          audioManager.setCommunicationDevice(device)
+          // setCommunicationDevice is synchronous; the legacy SCO broadcast is not
+          // guaranteed to fire on API 31+, so notify the listener immediately.
+          listener?.onBlScoConnected()
+          return
+        }
+      }
+      listener?.onBlScoNone()
+    } else {
+      @Suppress("DEPRECATION")
+      if (!audioManager.isBluetoothScoOn()) {
+        audioManager.startBluetoothSco()
+        // async — onBlScoConnected will be called via ACTION_SCO_AUDIO_STATE_UPDATED broadcast
+      }
     }
-
-    return true
   }
 
-  @Suppress("DEPRECATION")
-  fun stopBluetooth() {
-    if (audioManager.isBluetoothScoOn()) {
-      audioManager.stopBluetoothSco()
+  private fun stopBluetoothSco() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      audioManager.clearCommunicationDevice()
+    } else {
+      @Suppress("DEPRECATION")
+      if (audioManager.isBluetoothScoOn()) {
+        audioManager.stopBluetoothSco()
+      }
     }
   }
 }
-

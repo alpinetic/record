@@ -18,7 +18,7 @@ class RecorderWrapper(
   private val context: Context,
   recorderId: String,
   messenger: BinaryMessenger,
-) : BluetoothScoListener {
+) {
   companion object {
     const val EVENTS_STATE_CHANNEL = "com.llfbandit.record/events/"
     const val EVENTS_RECORD_CHANNEL = "com.llfbandit.record/eventsRecord/"
@@ -129,12 +129,18 @@ class RecorderWrapper(
   private fun startRecording(config: RecordConfig, result: MethodChannel.Result) {
     try {
       if (recorder == null) {
-        recorder = createRecorder(config)
-        start(config, result)
+        maybeStartBluetoothSco(config) {
+          recorder = createRecorder(config)
+          start(config, result)
+        }
       } else if (recorder!!.isRecording) {
-        recorder!!.stop(fun(_) = start(config, result))
+        recorder!!.stop(fun(_) = maybeStartBluetoothSco(config) {
+          start(config, result)
+        })
       } else {
-        start(config, result)
+        maybeStartBluetoothSco(config) {
+          start(config, result)
+        }
       }
     } catch (e: Exception) {
       result.error("record", e.message, e.cause)
@@ -142,10 +148,6 @@ class RecorderWrapper(
   }
 
   private fun createRecorder(config: RecordConfig): IRecorder {
-    if (config.manageBluetooth) {
-      maybeStartBluetooth(config)
-    }
-
     if (config.useLegacy) {
       return MediaRecorder(context, recorderStateStreamHandler)
     }
@@ -169,33 +171,38 @@ class RecorderWrapper(
   ///////////////////////////////////////////////////////////
   // Bluetooth SCO
   ///////////////////////////////////////////////////////////
-  private fun maybeStartBluetooth(config: RecordConfig) {
+  private fun maybeStartBluetoothSco(config: RecordConfig, onDone: () -> Unit) {
+    if (!config.manageBluetoothSco) {
+      onDone()
+      return
+    }
+
     if (config.device != null && config.device.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
       maybeStopBluetooth()
+      onDone()
       return
     }
 
     if (bluetoothReceiver == null) {
       bluetoothReceiver = BluetoothReceiver(context)
-    }
+      bluetoothReceiver!!.register(object : BluetoothScoListener {
+        override fun onBlScoConnected() {
+          onDone()
+        }
 
-    if (!bluetoothReceiver!!.hasListeners()) {
-      bluetoothReceiver!!.register()
-      bluetoothReceiver!!.addListener(this)
+        override fun onBlScoNone() {
+          onDone()
+        }
+
+        override fun onBlScoDisconnected() {}
+      })
+    } else {
+      onDone()
     }
   }
 
   private fun maybeStopBluetooth() {
-    bluetoothReceiver?.removeListener(this)
-
-    if (bluetoothReceiver?.hasListeners() != true) {
-      bluetoothReceiver?.unregister()
-    }
-  }
-
-  override fun onBlScoConnected() {
-  }
-
-  override fun onBlScoDisconnected() {
+    bluetoothReceiver?.unregister()
+    bluetoothReceiver = null
   }
 }

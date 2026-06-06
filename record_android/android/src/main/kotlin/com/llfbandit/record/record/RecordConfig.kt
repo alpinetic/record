@@ -21,7 +21,7 @@ class RecordConfig(
   val noiseSuppress: Boolean = false,
   val useLegacy: Boolean = false,
   val muteAudio: Boolean = false,
-  val manageBluetooth: Boolean = true,
+  val manageBluetoothSco: Boolean = true,
   val audioSource: Int = MediaRecorder.AudioSource.DEFAULT,
   val speakerphone: Boolean = false,
   val audioManagerMode: Int = AudioManager.MODE_NORMAL,
