@@ -21,7 +21,7 @@ namespace record_windows
 	struct RecordConfig
 	{
 		std::string encoderName = AudioEncoder().aacLc;
-		std::string deviceId = NULL;
+		std::string deviceId = {};
 		int bitRate = 128000;
 		int sampleRate = 44100;
 		int numChannels = 2;
