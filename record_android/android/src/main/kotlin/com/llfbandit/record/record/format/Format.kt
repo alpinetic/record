@@ -1,17 +1,11 @@
 package com.llfbandit.record.record.format
 
-import android.media.MediaCodecInfo
 import android.media.MediaFormat
-import android.util.Log
-import android.util.Range
+import com.llfbandit.record.record.AudioEncoder
 import com.llfbandit.record.record.RecordConfig
 import com.llfbandit.record.record.container.IContainerWriter
 import com.llfbandit.record.record.encoder.EncoderListener
 import com.llfbandit.record.record.encoder.IEncoder
-import com.llfbandit.record.record.encoder.MediaCodecEncoder
-import com.llfbandit.record.record.encoder.PassthroughEncoder
-import kotlin.math.abs
-
 
 /**
  * Represents an audio format.
@@ -24,53 +18,18 @@ sealed class Format {
    */
   abstract val mimeTypeAudio: String
 
-  /** 'true' if the format takes PCM samples without encoding. */
-  abstract val passthrough: Boolean
-
   /**
    * Create a [MediaFormat] representing the encoded audio with parameters matching the specified
    * input PCM audio format.
    */
   abstract fun getMediaFormat(config: RecordConfig): MediaFormat
 
-  protected open fun adjustSampleRate(format: MediaFormat, sampleRate: Int) {
+  internal open fun adjustSampleRate(format: MediaFormat, sampleRate: Int) {
     format.setInteger(MediaFormat.KEY_SAMPLE_RATE, sampleRate)
   }
 
-  private fun adjustBitRate(format: MediaFormat, bitRate: Int) {
-    format.setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
-  }
-
-  protected open fun adjustNumChannels(format: MediaFormat, numChannels: Int) {
+  internal open fun adjustNumChannels(format: MediaFormat, numChannels: Int) {
     format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, numChannels)
-  }
-
-  /**
-   * Create an encoder that produces [MediaFormat] output.
-   */
-  fun getEncoder(
-    config: RecordConfig,
-    listener: EncoderListener
-  ): Pair<IEncoder, MediaFormat> {
-
-    val mediaFormat = getMediaFormat(config)
-
-    return if (passthrough) {
-      Pair(
-        PassthroughEncoder(config, this, mediaFormat, listener),
-        mediaFormat
-      )
-    } else {
-      val codec = CodecSelector.findCodec(this, config, mediaFormat)
-        ?: throw Exception(
-          "No codec found for given config $mediaFormat. You should try with other values."
-        )
-
-      Pair(
-        MediaCodecEncoder(config, this, mediaFormat, listener, codec),
-        mediaFormat
-      )
-    }
   }
 
   /**
@@ -80,75 +39,32 @@ sealed class Format {
    */
   abstract fun createWriter(path: String?): IContainerWriter
 
-  /**
-   * Attempts to adjust [mediaFormat] to fit within [caps], using format-specific hook methods.
-   * Returns true if the format is supported after adjustment.
-   */
-  internal fun adjustToCapabilities(
-    caps: MediaCodecInfo.CodecCapabilities,
-    config: RecordConfig,
-    mediaFormat: MediaFormat
-  ): Boolean {
-    if (!caps.isFormatSupported(mediaFormat)) {
-      val audioCapabilities = caps.audioCapabilities
-
-      if (audioCapabilities != null) {
-        adjustBitRate(
-          mediaFormat,
-          checkBounds(audioCapabilities.bitrateRange, config.bitRate)
-        )
-        if (audioCapabilities.supportedSampleRates != null) {
-          adjustSampleRate(
-            mediaFormat,
-            nearestValue(
-              audioCapabilities.supportedSampleRates,
-              config.sampleRate
-            )
-          )
-        }
-        adjustNumChannels(
-          mediaFormat,
-          checkBounds(Range(1, audioCapabilities.maxInputChannelCount), config.numChannels)
-        )
-      }
-
-      return caps.isFormatSupported(mediaFormat)
-    }
-
-    return true
-  }
-
-  protected fun nearestValue(values: IntArray, value: Int): Int {
-    var distance: Int = abs(values[0] - value)
-    var idx = 0
-
-    for (c in 1 until values.size) {
-      val cDistance = abs(values[c] - value)
-      if (cDistance < distance) {
-        idx = c
-        distance = cDistance
-      }
-    }
-
-    if (value != values[idx]) {
-      Log.d(TAG, "Available values: ${values.indices.map { values[it] }}")
-      Log.d(TAG, "Adjusted to: ${values[idx]}")
-    }
-
-    return values[idx]
-  }
-
-  private fun checkBounds(range: Range<Int>, value: Int): Int {
-    if (range.lower > value) {
-      return range.lower
-    } else if (range.upper < value) {
-      return range.upper
-    }
-    return value
-  }
-
   companion object {
     const val KEY_X_FRAME_SIZE_IN_BYTES = "x-frame-size-in-bytes"
-    private val TAG = Format::class.java.simpleName
+
+    /**
+     * Create an encoder that produces [MediaFormat] output.
+     */
+    fun createEncoder(
+      config: RecordConfig,
+      listener: EncoderListener
+    ): Pair<IEncoder, MediaFormat> {
+      val format = selectFormat(config)
+      val mediaFormat = format.getMediaFormat(config)
+      val encoder = FormatCodecSelector.findCodec(format, config, mediaFormat, listener)
+      return Pair(encoder, mediaFormat)
+    }
+
+    private fun selectFormat(config: RecordConfig): Format {
+      return when (config.encoder) {
+        AudioEncoder.AacLc, AudioEncoder.AacEld, AudioEncoder.AacHe -> AacFormat()
+        AudioEncoder.AmrNb -> AmrNbFormat()
+        AudioEncoder.AmrWb -> AmrWbFormat()
+        AudioEncoder.Flac -> FlacFormat()
+        AudioEncoder.Pcm16bits -> PcmFormat()
+        AudioEncoder.Opus -> OpusFormat()
+        AudioEncoder.Wav -> WaveFormat()
+      }
+    }
   }
 }

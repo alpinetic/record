@@ -13,7 +13,6 @@ class AmrNbFormat : Format() {
   )
 
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_AMR_NB
-  override val passthrough: Boolean = false
 
   override fun getMediaFormat(config: RecordConfig): MediaFormat {
     val format = MediaFormat().apply {

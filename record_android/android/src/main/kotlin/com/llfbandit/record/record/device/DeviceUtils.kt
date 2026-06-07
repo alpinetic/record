@@ -1,8 +1,12 @@
 package com.llfbandit.record.record.device
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioDeviceInfo
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
 
 class DeviceUtils {
@@ -39,6 +43,39 @@ class DeviceUtils {
 
       return listInputDevices(context).firstOrNull {
         it.id.toString() == device["id"]
+      }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun getDefaultInputDevice(): AudioDeviceInfo? {
+      val channelConfig = AudioFormat.CHANNEL_IN_MONO
+      val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+      val sampleRate = 8000
+      val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+      if (bufferSize <= 0) return null
+
+      val probe = try {
+        AudioRecord(
+          MediaRecorder.AudioSource.DEFAULT,
+          sampleRate, channelConfig, audioFormat, bufferSize
+        )
+      } catch (_: Exception) {
+        return null
+      }
+
+      if (probe.state != AudioRecord.STATE_INITIALIZED) {
+        probe.release()
+        return null
+      }
+
+      return try {
+        probe.startRecording()
+        probe.routedDevice
+      } catch (_: Exception) {
+        null
+      } finally {
+        try { probe.stop() } catch (_: Exception) {}
+        probe.release()
       }
     }
 

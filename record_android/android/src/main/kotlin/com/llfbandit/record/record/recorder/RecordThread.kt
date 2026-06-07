@@ -1,19 +1,11 @@
 package com.llfbandit.record.record.recorder
 
 import com.llfbandit.record.Utils
-import com.llfbandit.record.record.AudioEncoder
 import com.llfbandit.record.record.PCMReader
 import com.llfbandit.record.record.RecordConfig
 import com.llfbandit.record.record.encoder.EncoderListener
 import com.llfbandit.record.record.encoder.IEncoder
-import com.llfbandit.record.record.format.AacFormat
-import com.llfbandit.record.record.format.AmrNbFormat
-import com.llfbandit.record.record.format.AmrWbFormat
-import com.llfbandit.record.record.format.FlacFormat
 import com.llfbandit.record.record.format.Format
-import com.llfbandit.record.record.format.OpusFormat
-import com.llfbandit.record.record.format.PcmFormat
-import com.llfbandit.record.record.format.WaveFormat
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicBoolean
@@ -91,10 +83,9 @@ class RecordThread(
       var encoder: IEncoder? = null
 
       try {
-        val format = selectFormat()
-        val (encoderImpl, adjustedFormat) = format.getEncoder(config, this)
+        val (encoderImpl, format) = Format.createEncoder(config, this)
 
-        pcmReader = PCMReader(config, adjustedFormat)
+        pcmReader = PCMReader(config, format)
         pcmReader.start()
 
         encoder = encoderImpl
@@ -157,18 +148,6 @@ class RecordThread(
     } finally {
       mRecordThread = null
       recorderListener.onStop()
-    }
-  }
-
-  private fun selectFormat(): Format {
-    return when (config.encoder) {
-      AudioEncoder.AacLc, AudioEncoder.AacEld, AudioEncoder.AacHe -> AacFormat()
-      AudioEncoder.AmrNb -> AmrNbFormat()
-      AudioEncoder.AmrWb -> AmrWbFormat()
-      AudioEncoder.Flac -> FlacFormat()
-      AudioEncoder.Pcm16bits -> PcmFormat()
-      AudioEncoder.Opus -> OpusFormat()
-      AudioEncoder.Wav -> WaveFormat()
     }
   }
 

@@ -11,7 +11,6 @@ class FlacFormat : Format() {
   )
 
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_FLAC
-  override val passthrough: Boolean = false
 
   override fun getMediaFormat(config: RecordConfig): MediaFormat {
     val format = MediaFormat().apply {

@@ -7,7 +7,6 @@ import com.llfbandit.record.record.container.WaveContainer
 
 class WaveFormat : Format() {
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_RAW
-  override val passthrough: Boolean = true
 
   private var frameSize: Int = 0
 

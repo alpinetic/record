@@ -7,7 +7,6 @@ import com.llfbandit.record.record.container.RawContainer
 
 class PcmFormat : Format() {
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_RAW
-  override val passthrough: Boolean = true
 
   override fun getMediaFormat(config: RecordConfig): MediaFormat {
     val bitsPerSample = 16

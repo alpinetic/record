@@ -11,7 +11,6 @@ import com.llfbandit.record.record.container.MuxerContainer
 
 class AacFormat : Format() {
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_AAC
-  override val passthrough: Boolean = false
 
   private var sampleRate: Int = 44100
   private var numChannels: Int = 2

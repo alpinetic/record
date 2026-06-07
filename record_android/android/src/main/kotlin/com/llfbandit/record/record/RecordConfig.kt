@@ -12,8 +12,8 @@ import io.flutter.plugin.common.MethodCall
 class RecordConfig(
   val path: String?,
   encoder: String,
-  val bitRate: Int,
-  val sampleRate: Int,
+  var bitRate: Int,
+  var sampleRate: Int,
   numChannels: Int,
   val device: AudioDeviceInfo?,
   val autoGain: Boolean = false,
@@ -28,7 +28,7 @@ class RecordConfig(
   audioInterruption: Int,
   val streamBufferSize: Int?
 ) {
-  val numChannels: Int = 2.coerceAtMost(1.coerceAtLeast(numChannels))
+  var numChannels: Int = 2.coerceAtMost(1.coerceAtLeast(numChannels))
   val audioInterruption: AudioInterruption = when (audioInterruption) {
     0 -> AudioInterruption.NONE
     1 -> AudioInterruption.PAUSE

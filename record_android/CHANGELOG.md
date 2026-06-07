@@ -1,4 +1,5 @@
 ## 2.0.2
+* fix: Codec and device caps. Now eagerly updates requested RecordConfig with mismatching values.
 * fix: Bluetooth SCO connection before audio recording.
 * fix: Prevents potential double pause event.
 * fix: Potential two stop events fired.
@@ -15,7 +16,6 @@
 * fix: Wrong channel count adjustment.
 * fix: Race condition. BUFFER_FLAG_END_OF_STREAM never queued if last encode() runs before mStoppedCompleter is assigned.
 * fix: Code style improvements.
-* fix: Codec channels caps and device channels caps.
 
 ## 2.0.1
 * fix: Build issue.
