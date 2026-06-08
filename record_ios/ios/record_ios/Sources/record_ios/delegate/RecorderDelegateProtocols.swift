@@ -13,8 +13,8 @@ public enum RecordState: Int {
 
 public protocol AudioRecordingDelegate {
   var config: RecordConfig? { get }
-  
-  func stop(completionHandler: @escaping (String?) -> ())
+
+  func stop() -> String?
   func cancel() throws
   func getAmplitude() -> Float
   func pause()

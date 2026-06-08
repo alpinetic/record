@@ -8,6 +8,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   private var m_audioEngine: AVAudioEngine?
   private var m_amplitude: Float = -160.0
   private let m_bus = 0
+  private let m_queue: DispatchQueue
   private var m_onRecord: () -> ()
   private var m_onPause: () -> ()
   private var m_onStop: () -> ()
@@ -16,14 +17,16 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   private var m_audioEncoder: AudioEnc?
   private var m_outputFormat: AVAudioFormat?
   private var m_interruptionObserver: NSObjectProtocol?
-  
-  init(manageAudioSession: Bool, onRecord: @escaping () -> (), onPause: @escaping () -> (), onStop: @escaping () -> ()) {
+  private let m_lock = NSLock()
+
+  init(queue: DispatchQueue, manageAudioSession: Bool, onRecord: @escaping () -> (), onPause: @escaping () -> (), onStop: @escaping () -> ()) {
+    m_queue = queue
     m_manageAudioSession = manageAudioSession
     m_onRecord = onRecord
     m_onPause = onPause
     m_onStop = onStop
   }
-  
+
   func start(config: RecordConfig, recordEventHandler: RecordStreamHandler) throws {
     let audioEngine = AVAudioEngine()
 
@@ -54,7 +57,6 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
     }
     converter.sampleRateConverterQuality = AVAudioQuality.high.rawValue
 
-
     audioEngine.inputNode.installTap(
       onBus: m_bus,
       bufferSize: AVAudioFrameCount(config.streamBufferSize ?? 1024),
@@ -76,8 +78,9 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
 
     m_onRecord()
   }
-  
-  func stop(completionHandler: @escaping (String?) -> ()) {
+
+  @discardableResult
+  func stop() -> String? {
     if let observer = m_interruptionObserver {
       NotificationCenter.default.removeObserver(observer)
       m_interruptionObserver = nil
@@ -93,18 +96,19 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
     m_audioEngine?.stop()
     m_audioEngine = nil
 
+    m_lock.lock()
     if let encoder = m_audioEncoder {
       encoder.dispose()
       m_audioEncoder = nil
     }
     m_outputFormat = nil
-
-    completionHandler(nil)
-    m_onStop()
-
     config = nil
+    m_lock.unlock()
+
+    m_onStop()
+    return nil
   }
-  
+
   func pause() {
     m_audioEngine?.pause()
     m_onPause()
@@ -114,20 +118,19 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
     try m_audioEngine?.start()
     m_onRecord()
   }
-  
+
   func cancel() throws {
-    stop { path in }
+    _ = stop()
   }
-  
-  func getAmplitude() -> Float {
-    return m_amplitude
-  }
-  
+
+  func getAmplitude() -> Float { m_amplitude }
+
   func dispose() {
-    stop { path in }
+    _ = stop()
   }
-  
-  // Set up AGC & echo cancel
+
+  // MARK: - Private
+
   private func setVoiceProcessing(echoCancel: Bool, autoGain: Bool, audioEngine: AVAudioEngine) throws {
     if #available(iOS 13.0, *) {
       do {
@@ -143,9 +146,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   }
 
   private func updateAmplitudeInt16(buffer: AVAudioPCMBuffer) {
-    guard let channelData = buffer.int16ChannelData else {
-      return
-    }
+    guard let channelData = buffer.int16ChannelData else { return }
 
     let frameCount = Int(buffer.frameLength)
     let firstChannelPointer = channelData[0]
@@ -153,44 +154,43 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
 
     for i in 0..<frameCount {
       let curSample = abs(Float(firstChannelPointer[i]))
-      if curSample > maxSample {
-        maxSample = curSample
-      }
+      if curSample > maxSample { maxSample = curSample }
     }
 
     m_amplitude = 20 * (log(maxSample / 32767.0) / log(10))
   }
-  
+
   private func stream(
     buffer: AVAudioPCMBuffer,
     dstFormat: AVAudioFormat,
     converter: AVAudioConverter,
     recordEventHandler: RecordStreamHandler
-  ) -> Void {
-
+  ) {
     guard let convertedBuffer = convertBuffer(buffer: buffer, dstFormat: dstFormat, converter: converter) else {
-      DispatchQueue.main.async { self.stop { _ in } }
+      m_queue.async { self.stop() }
       return
     }
 
     updateAmplitudeInt16(buffer: convertedBuffer)
 
-    if config?.encoder == AudioEncoder.aacLc.rawValue {
+    m_lock.lock()
+    let encoderName = config?.encoder
+    m_lock.unlock()
+
+    if encoderName == AudioEncoder.aacLc.rawValue {
       guard let dataList = encodeAac(buffer: convertedBuffer) else {
-        DispatchQueue.main.async { self.stop { _ in } }
+        m_queue.async { self.stop() }
         return
       }
-
       sendBytes(dataList: dataList, recordEventHandler: recordEventHandler)
-    } else if config?.encoder == AudioEncoder.pcm16bits.rawValue {
+    } else if encoderName == AudioEncoder.pcm16bits.rawValue {
       if let data = convertInt16toUInt8(buffer: convertedBuffer) {
         sendBytes(dataList: [data], recordEventHandler: recordEventHandler)
       }
     }
   }
-  
+
   private func sendBytes(dataList: [Data], recordEventHandler: RecordStreamHandler) {
-    // Send bytes
     if let eventSink = recordEventHandler.eventSink {
       for data in dataList {
         DispatchQueue.main.async {
@@ -199,41 +199,40 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
       }
     }
   }
-  
+
   private func convertBuffer(
     buffer: AVAudioPCMBuffer,
     dstFormat: AVAudioFormat,
-    converter: AVAudioConverter) -> AVAudioPCMBuffer? {
-
+    converter: AVAudioConverter
+  ) -> AVAudioPCMBuffer? {
     let inputCallback: AVAudioConverterInputBlock = { inNumPackets, outStatus in
       outStatus.pointee = .haveData
       return buffer
     }
-    
-    // Determine frame capacity
+
     let capacity = AVAudioFrameCount(Double(buffer.frameLength) * dstFormat.sampleRate / buffer.format.sampleRate)
-    
-    // Destination buffer
+
     guard let convertedBuffer = AVAudioPCMBuffer(pcmFormat: dstFormat, frameCapacity: capacity) else {
       print("Unable to create output buffer")
       return nil
     }
-    
-    // Convert input buffer (resample, num channels)
+
     var error: NSError? = nil
     converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputCallback)
     if error != nil {
       print("Unable to convert input buffer \(error!)")
       return nil
     }
-      
+
     return convertedBuffer
   }
-  
+
   private func encodeAac(buffer: AVAudioPCMBuffer) -> [Data]? {
-    // Lazily initialize AAC encoder
+    m_lock.lock()
+
     if m_audioEncoder == nil {
       guard let config = config, let outputFormat = m_outputFormat else {
+        m_lock.unlock()
         return nil
       }
       let encoder = AacAdtsEncoder()
@@ -241,27 +240,29 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
         try encoder.setup(config: config, format: outputFormat)
       } catch {
         print("Failed to setup AAC encoder: \(error)")
+        m_lock.unlock()
         return nil
       }
       m_audioEncoder = encoder
     }
 
     guard let encoder = m_audioEncoder else {
+      m_lock.unlock()
       return nil
     }
 
+    m_lock.unlock()
+
     return encoder.encode(buffer: buffer)
   }
-  
+
   // Little endian
   private func convertInt16toUInt8(buffer: AVAudioPCMBuffer) -> Data? {
-    guard let channelData = buffer.int16ChannelData else {
-      return nil
-    }
-    
+    guard let channelData = buffer.int16ChannelData else { return nil }
+
     let frameCount = Int(buffer.frameLength)
     let channels = Int(buffer.format.channelCount)
-    
+
     var bytes = Data(capacity: frameCount * channels * 2)
     for frame in 0..<frameCount {
       for ch in 0..<channels {
@@ -270,7 +271,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
         bytes.append(UInt8((sample >> 8) & 0x00FF))
       }
     }
-    
+
     return bytes
   }
 }

@@ -8,12 +8,14 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
   private var m_path: String?
   private var m_stoppingIntentionally = false
   private var m_interruptionObserver: NSObjectProtocol?
+  private let m_queue: DispatchQueue
   private var m_onRecord: () -> ()
   private var m_onPause: () -> ()
   private var m_onStop: () -> ()
   private let m_manageAudioSession: Bool
 
-  init(manageAudioSession: Bool, onRecord: @escaping () -> (), onPause: @escaping () -> (), onStop: @escaping () -> ()) {
+  init(queue: DispatchQueue, manageAudioSession: Bool, onRecord: @escaping () -> (), onPause: @escaping () -> (), onStop: @escaping () -> ()) {
+    m_queue = queue
     m_manageAudioSession = manageAudioSession
     m_onRecord = onRecord
     m_onPause = onPause
@@ -26,13 +28,11 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
     m_interruptionObserver = try initAVAudioSession(config: config, manageAudioSession: m_manageAudioSession)
 
     let url = URL(fileURLWithPath: path)
-
     let recorder = try AVAudioRecorder(url: url, settings: getOutputSettings(config: config))
 
     recorder.delegate = self
     recorder.isMeteringEnabled = true
     recorder.prepareToRecord()
-
     recorder.record()
 
     m_audioRecorder = recorder
@@ -42,7 +42,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
     m_onRecord()
   }
 
-  func stop(completionHandler: @escaping (String?) -> ()) {
+  func stop() -> String? {
     if let observer = m_interruptionObserver {
       NotificationCenter.default.removeObserver(observer)
       m_interruptionObserver = nil
@@ -52,23 +52,21 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
     m_audioRecorder?.stop()
     m_audioRecorder = nil
 
-    completionHandler(m_path)
-    m_onStop()
-
+    let path = m_path
     m_path = nil
     config = nil
+
+    m_onStop()
+    return path
   }
 
   func pause() {
-    guard let recorder = m_audioRecorder, recorder.isRecording else {
-      return
-    }
-
+    guard let recorder = m_audioRecorder, recorder.isRecording else { return }
     recorder.pause()
     m_onPause()
   }
 
-  func resume() {
+  func resume() throws {
     guard let recorder = m_audioRecorder else { return }
     recorder.record()
     m_onRecord()
@@ -76,9 +74,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
 
   func cancel() throws {
     guard let path = m_path else { return }
-
-    stop { path in }
-
+    _ = stop()
     try deleteFile(path: path)
   }
 
@@ -86,27 +82,28 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVAudioRecorde
     m_audioRecorder?.updateMeters()
     return m_audioRecorder?.averagePower(forChannel: 0) ?? -160
   }
-  
+
   func dispose() {
-    stop { path in }
+    _ = stop()
   }
 
   func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-    if m_stoppingIntentionally {
-      m_stoppingIntentionally = false
-      return
-    }
-    // System-terminated recording (disk full, audio route loss, etc.) — clean up state.
-    stop { _ in }
-  }
-  
-  private func deleteFile(path: String) throws {
-    do {
-      let fileManager = FileManager.default
-      
-      if fileManager.fileExists(atPath: path) {
-        try fileManager.removeItem(atPath: path)
+    // Dispatches to m_queue so it is serialized with stop() calls from the plugin.
+    m_queue.async {
+      if self.m_stoppingIntentionally {
+        self.m_stoppingIntentionally = false
+        return
       }
+      // System-terminated recording (disk full, audio route loss, etc.) — clean up state.
+      _ = self.stop()
+    }
+  }
+
+  private func deleteFile(path: String) throws {
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: path) else { return }
+    do {
+      try fileManager.removeItem(atPath: path)
     } catch {
       throw RecorderError.error(message: "Failed to delete previous recording", details: error.localizedDescription)
     }
