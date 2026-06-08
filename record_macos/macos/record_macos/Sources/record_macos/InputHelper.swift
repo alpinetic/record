@@ -50,21 +50,7 @@ func getInputDevice(device: Device?) throws -> AVCaptureDeviceInput? {
 }
 
 func getInputChannelCount(device: Device?) -> Int? {
-  var deviceID: AudioDeviceID = kAudioObjectUnknown
-
-  if let uid = device?.id, let id = getAudioDeviceIDFromUID(uid: uid) {
-    deviceID = id
-  } else {
-    var addr = AudioObjectPropertyAddress(
-      mSelector: kAudioHardwarePropertyDefaultInputDevice,
-      mScope: kAudioObjectPropertyScopeGlobal,
-      mElement: kAudioObjectPropertyElementMain
-    )
-    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &deviceID) == noErr else {
-      return nil
-    }
-  }
+  guard let deviceID = resolveInputDeviceID(device: device) else { return nil }
 
   var addr = AudioObjectPropertyAddress(
     mSelector: kAudioDevicePropertyStreamConfiguration,
@@ -83,21 +69,7 @@ func getInputChannelCount(device: Device?) -> Int? {
 }
 
 func getInputSampleRate(device: Device?) -> Double? {
-  var deviceID: AudioDeviceID = kAudioObjectUnknown
-
-  if let uid = device?.id, let id = getAudioDeviceIDFromUID(uid: uid) {
-    deviceID = id
-  } else {
-    var addr = AudioObjectPropertyAddress(
-      mSelector: kAudioHardwarePropertyDefaultInputDevice,
-      mScope: kAudioObjectPropertyScopeGlobal,
-      mElement: kAudioObjectPropertyElementMain
-    )
-    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &deviceID) == noErr else {
-      return nil
-    }
-  }
+  guard let deviceID = resolveInputDeviceID(device: device) else { return nil }
 
   var addr = AudioObjectPropertyAddress(
     mSelector: kAudioDevicePropertyNominalSampleRate,
@@ -108,6 +80,23 @@ func getInputSampleRate(device: Device?) -> Double? {
   var size = UInt32(MemoryLayout<Float64>.size)
   guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &rate) == noErr, rate > 0 else { return nil }
   return rate
+}
+
+private func resolveInputDeviceID(device: Device?) -> AudioDeviceID? {
+  if let uid = device?.id {
+    return getAudioDeviceIDFromUID(uid: uid)
+  }
+  var addr = AudioObjectPropertyAddress(
+    mSelector: kAudioHardwarePropertyDefaultInputDevice,
+    mScope: kAudioObjectPropertyScopeGlobal,
+    mElement: kAudioObjectPropertyElementMain
+  )
+  var deviceID: AudioDeviceID = kAudioObjectUnknown
+  var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+  guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &deviceID) == noErr else {
+    return nil
+  }
+  return deviceID
 }
 
 func getAudioDeviceIDFromUID(uid: String) -> AudioDeviceID? {
