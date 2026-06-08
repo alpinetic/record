@@ -2,7 +2,7 @@ import AVFoundation
 
 extension AudioRecordingDelegate {
   func getFileTypeFromSettings(_ settings: [String: Any]) -> AVFileType {
-    let formatId = settings[AVFormatIDKey] as! UInt32
+    let formatId = settings[AVFormatIDKey] as? UInt32
     switch formatId {
     case kAudioFormatAMR, kAudioFormatAMR_WB: return .mobile3GPP
     case kAudioFormatLinearPCM:               return .wav
