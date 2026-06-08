@@ -7,6 +7,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
 
   private var m_audioEngine: AVAudioEngine?
   private var m_processor: AudioStreamProcessor?
+  private var m_isPaused = false
   private let m_lock = NSLock()
   private let m_bus = 0
   private let m_queue: DispatchQueue
@@ -75,6 +76,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
     m_audioEngine = nil
 
     m_lock.withLock {
+      m_isPaused = false
       m_processor?.dispose()
       m_processor = nil
     }
@@ -85,12 +87,14 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   }
 
   func pause() {
+    m_lock.withLock { m_isPaused = true }
     m_audioEngine?.pause()
     m_onPause()
   }
 
   func resume() throws {
     try m_audioEngine?.start()
+    m_lock.withLock { m_isPaused = false }
     m_onRecord()
   }
 
@@ -105,7 +109,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   // MARK: - Private
 
   private func handleTap(buffer: AVAudioPCMBuffer, recordEventHandler: RecordStreamHandler) {
-    let processor = m_lock.withLock { m_processor }
+    let processor = m_lock.withLock { m_isPaused ? nil : m_processor }
 
     guard let processor else { return }
 
