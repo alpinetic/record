@@ -60,7 +60,13 @@ class AudioStreamProcessor {
     guard let out = AVAudioPCMBuffer(pcmFormat: m_converter.outputFormat, frameCapacity: capacity) else {
       return nil
     }
+    var provided = false
     let inputCallback: AVAudioConverterInputBlock = { _, outStatus in
+      if provided {
+        outStatus.pointee = .noDataNow
+        return nil
+      }
+      provided = true
       outStatus.pointee = .haveData
       return buffer
     }
