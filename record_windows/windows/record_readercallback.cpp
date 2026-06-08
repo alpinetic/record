@@ -36,6 +36,15 @@ namespace record_windows
 					m_dataWritten = 0;
 				}
 
+				if (m_bResuming)
+				{
+					m_bResuming = false;
+					// Shift base so rebased timestamps continue from where we paused.
+					// Without this, (llTimestamp - old_base) would jump backward.
+					m_llBaseTime = llTimestamp - (m_llLastTime - m_llBaseTime);
+					UpdateState(RecordState::record);
+				}
+
 				// Save current timestamp in case of Pause
 				m_llLastTime = llTimestamp;
 

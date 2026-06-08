@@ -172,13 +172,11 @@ namespace record_windows
 			PropVariantInit(&var);
 			var.vt = VT_EMPTY;
 
-			m_llBaseTime = m_llLastTime;
-
 			hr = m_pSource->Start(m_pPresentationDescriptor, NULL, &var);
 
 			if (SUCCEEDED(hr))
 			{
-				UpdateState(RecordState::record);
+				m_bResuming = true;
 			}
 		}
 
@@ -270,8 +268,9 @@ namespace record_windows
 		}
 
 		m_bFirstSample = true;
-		m_llBaseTime = 0;
-		m_llLastTime = 0;
+		m_bResuming    = false;
+		m_llBaseTime   = 0;
+		m_llLastTime   = 0;
 
 		m_amplitude.reset();
 		m_dataWritten = 0;

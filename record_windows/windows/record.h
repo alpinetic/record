@@ -69,6 +69,7 @@ namespace record_windows
 		bool                       m_mfStarted = false;
 
 		bool     m_bFirstSample = true;
+		bool     m_bResuming    = false;
 		LONGLONG m_llBaseTime   = 0;
 		LONGLONG m_llLastTime   = 0;
 
