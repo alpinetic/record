@@ -33,7 +33,7 @@ External dependencies:
 | aacLc           | ✔️            |   ✔️    |  ?      |   ✔️    |  ✔️    |  ✔️ 
 | aacEld          | ✔️            |   ✔️    |   ?     |         |  ✔️    | 
 | aacHe           | ✔️            |         |   ?     |         |         |   
-| amrNb           | ✔️            |         |  ?      |   ✔️    |         |  
+| amrNb           | ✔️            |   ✔️     |  ?      |   ✔️    |         |  
 | amrWb           | ✔️            |         |  ?      |          |        |  
 | opus            | ✔️            |   ✔️ 4    |  ?       |         |         |  ✔️ 
 | wav             | ✔️ 2          |   ✔️    |   ✔️   |    ✔️    |   ✔️  |   ✔️ 

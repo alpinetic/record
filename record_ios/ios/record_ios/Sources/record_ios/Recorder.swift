@@ -116,6 +116,7 @@ class Recorder {
     switch encoder {
     case AudioEncoder.aacLc.rawValue,
          AudioEncoder.aacEld.rawValue,
+         AudioEncoder.amrNb.rawValue,
          AudioEncoder.flac.rawValue,
          AudioEncoder.opus.rawValue,
          AudioEncoder.pcm16bits.rawValue,

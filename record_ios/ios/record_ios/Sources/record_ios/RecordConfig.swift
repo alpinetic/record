@@ -20,9 +20,9 @@ public enum AudioInterruptionMode: Int {
 
 public class RecordConfig {
   let encoder: String
-  let bitRate: Int
-  let sampleRate: Int
-  let numChannels: Int
+  var bitRate: Int
+  var sampleRate: Int
+  var numChannels: Int
   let device: Device?
   let autoGain: Bool
   let echoCancel: Bool
