@@ -50,9 +50,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
     try engine.start()
 
     m_audioEngine = engine
-    m_lock.lock()
-    m_processor = processor
-    m_lock.unlock()
+    m_lock.withLock { m_processor = processor }
     self.config = config
     m_onRecord()
   }
@@ -71,10 +69,10 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
     }
     m_audioEngine = nil
 
-    m_lock.lock()
-    m_processor?.dispose()
-    m_processor = nil
-    m_lock.unlock()
+    m_lock.withLock {
+      m_processor?.dispose()
+      m_processor = nil
+    }
 
     config = nil
     m_onStop()
@@ -94,9 +92,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   func cancel() throws { _ = stop() }
 
   func getAmplitude() -> Float {
-    m_lock.lock()
-    defer { m_lock.unlock() }
-    return m_processor?.getAmplitude() ?? -160.0
+    m_lock.withLock { m_processor?.getAmplitude() ?? -160.0 }
   }
 
   func dispose() { _ = stop() }
@@ -104,17 +100,16 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
   // MARK: - Private
 
   private func handleTap(buffer: AVAudioPCMBuffer, recordEventHandler: RecordStreamHandler) {
-    m_lock.lock()
-    let processor = m_processor
-    m_lock.unlock()
+    let processor = m_lock.withLock { m_processor }
 
     guard let processor else { return }
 
     guard let dataList = processor.process(buffer: buffer) else {
-      m_lock.lock()
-      let toDispose = m_processor
-      m_processor = nil
-      m_lock.unlock()
+      let toDispose = m_lock.withLock { () -> AudioStreamProcessor? in
+        let p = m_processor
+        m_processor = nil
+        return p
+      }
       guard toDispose != nil else { return }
       m_queue.async {
         toDispose?.dispose()
