@@ -72,16 +72,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVCaptureFileO
   }
 
   func stop() -> String? {
-    m_stoppingIntentionally = true
-    m_audioOutput?.stopRecording()
-    m_audioOutput = nil
-    m_audioSession?.stopRunning()
-    m_audioSession = nil
-
-    let path = m_path
-    m_path = nil
-    config = nil
-
+    let path = teardown()
     m_onStop()
     return path
   }
@@ -100,7 +91,7 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVCaptureFileO
 
   func cancel() throws {
     guard let path = m_path else { return }
-    _ = stop()
+    _ = teardown()
     try deleteFile(path: path)
   }
 
@@ -126,6 +117,19 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVCaptureFileO
       // System-terminated recording (disk full, audio route loss, etc.) — clean up state.
       _ = self.stop()
     }
+  }
+
+  @discardableResult
+  private func teardown() -> String? {
+    m_stoppingIntentionally = true
+    m_audioOutput?.stopRecording()
+    m_audioOutput = nil
+    m_audioSession?.stopRunning()
+    m_audioSession = nil
+    let path = m_path
+    m_path = nil
+    config = nil
+    return path
   }
 
   private func deleteFile(path: String) throws {

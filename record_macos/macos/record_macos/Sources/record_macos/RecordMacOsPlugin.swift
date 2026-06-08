@@ -82,6 +82,7 @@ public class RecordMacOsPlugin: NSObject, FlutterPlugin {
     let recorder = Recorder(queue: m_recorderQueue, stateEventHandler: stateEventHandler, recordEventHandler: recordEventHandler)
 
     m_recorderQueue.async {
+      self.m_recorders[recorderId]?.dispose()
       self.m_recorders[recorderId] = recorder
       DispatchQueue.main.async { result(nil) }
     }
