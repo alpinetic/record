@@ -57,7 +57,7 @@ private extension AudioRecordingDelegate {
   func initialOutputSettings(config: RecordConfig) -> [String: Any] {
     switch config.encoder {
     case AudioEncoder.aacLc.rawValue:  return aacSettings(formatId: kAudioFormatMPEG4AAC,        config: config)
-    case AudioEncoder.aacEld.rawValue: return aacSettings(formatId: kAudioFormatMPEG4AAC_ELD_V2, config: config)
+    case AudioEncoder.aacEld.rawValue: return aacSettings(formatId: kAudioFormatMPEG4AAC_ELD, config: config)
     case AudioEncoder.aacHe.rawValue:  return aacSettings(formatId: config.numChannels > 1 ? kAudioFormatMPEG4AAC_HE_V2 : kAudioFormatMPEG4AAC_HE, config: config)
     case AudioEncoder.amrNb.rawValue:  return amrNbSettings(config: config)
     case AudioEncoder.amrWb.rawValue:  return amrWbSettings(config: config)
