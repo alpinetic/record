@@ -28,10 +28,10 @@ class RecordLinux extends RecordPlatform {
 
   @override
   Future<void> dispose(String recorderId) async {
+    await stop(recorderId);
+
     await _stateStreamCtrl?.close();
     _stateStreamCtrl = null;
-
-    await stop(recorderId);
   }
 
   @override
@@ -56,6 +56,7 @@ class RecordLinux extends RecordPlatform {
       case AudioEncoder.flac:
       case AudioEncoder.opus:
       case AudioEncoder.wav:
+      case AudioEncoder.pcm16bits:
         return true;
       default:
         return false;
@@ -107,7 +108,7 @@ class RecordLinux extends RecordPlatform {
 
     // Step 2: Pipe the raw PCM through amplitude monitoring to ffmpeg for encoding
     // parecord (capture) -> amplitude calculation -> ffmpeg (encode to file)
-    _startFfmpegWithAmplitudeMonitoring(config, _parecordProcess!, path);
+    await _startFfmpegWithAmplitudeMonitoring(config, _parecordProcess!, path);
 
     _path = path;
     _updateState(RecordState.record);
@@ -148,6 +149,7 @@ class RecordLinux extends RecordPlatform {
     // Close ffmpeg stdin and wait for it to finish
     if (_ffmpegProcess case final process?) {
       // Wait for ffmpeg to finish writing
+      await process.stdin.close();
       await process.exitCode;
       _ffmpegProcess = null;
     }
@@ -251,13 +253,13 @@ class RecordLinux extends RecordPlatform {
   ) {
     switch (encoder) {
       case AudioEncoder.aacLc:
-        return ['-c:a', 'aac', '-b:a', '${bitRate / 1000}k', path];
+        return ['-c:a', 'aac', '-b:a', '${bitRate ~/ 1000}k', path];
       case AudioEncoder.wav:
         return ['-c:a', 'pcm_s16le', '-f', 'wav', path];
       case AudioEncoder.flac:
         return ['-c:a', 'flac', path];
       case AudioEncoder.opus:
-        return ['-c:a', 'libopus', '-b:a', '${bitRate / 1000}k', path];
+        return ['-c:a', 'libopus', '-b:a', '${bitRate ~/ 1000}k', path];
       case AudioEncoder.pcm16bits:
         return ['-c:a', 'copy', '-f', 's16le', path];
       default:
@@ -328,29 +330,29 @@ class RecordLinux extends RecordPlatform {
     String? currentDeviceId;
     String? currentDeviceName;
 
-    for (final line in output) {
-      if (line.startsWith('Source #')) {
-        if (currentDeviceId != null && currentDeviceName != null) {
-          if (!currentDeviceName.startsWith('Monitor of')) {
-            devices.add(
-              InputDevice(id: currentDeviceId, label: currentDeviceName),
-            );
-          }
-        }
-      } else if (line.trim().startsWith('node.name')) {
-        currentDeviceId = line.split('=')[1].trim();
-      } else if (line.trim().startsWith('Name:')) {
-        currentDeviceName = line.split(':')[1].trim();
-      } else if (line.trim().startsWith('Description:')) {
-        currentDeviceName = line.split(':')[1].trim();
-      }
-    }
-
-    if (currentDeviceId != null && currentDeviceName != null) {
-      if (!currentDeviceName.startsWith('Monitor of')) {
+    void commitDevice() {
+      if (currentDeviceId != null &&
+          currentDeviceName != null &&
+          !currentDeviceName.startsWith('Monitor of')) {
         devices.add(InputDevice(id: currentDeviceId, label: currentDeviceName));
       }
     }
+
+    for (final line in output) {
+      if (line.startsWith('Source #')) {
+        commitDevice();
+        currentDeviceId = null;
+        currentDeviceName = null;
+      } else if (line.trim().startsWith('node.name')) {
+        currentDeviceId = line.split('=')[1].trim();
+      } else if (line.trim().startsWith('Name:')) {
+        currentDeviceName = line.substring(line.indexOf(':') + 1).trim();
+      } else if (line.trim().startsWith('Description:')) {
+        currentDeviceName = line.substring(line.indexOf(':') + 1).trim();
+      }
+    }
+
+    commitDevice();
 
     return devices;
   }
@@ -427,10 +429,11 @@ class RecordLinux extends RecordPlatform {
     // 1. Calculate amplitude for VU meter
     // 2. Forward the unchanged PCM data to our stream controller
     parecordProc.stdout.listen((data) {
-      _calculateAmplitude(Uint8List.fromList(data));
+      final typed = data is Uint8List ? data : Uint8List.fromList(data);
+      _calculateAmplitude(typed);
 
       if (_inputPcmController case final ctrl? when !ctrl.isClosed) {
-        ctrl.add(data);
+        ctrl.add(typed);
       }
     }, onDone: () => _inputPcmController?.close());
 

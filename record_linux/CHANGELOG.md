@@ -1,3 +1,11 @@
+## 2.0.1
+* fix: Missing await on _startFfmpegWithAmplitudeMonitoring.
+* fix: Ensures EOF reaches ffmpeg.
+* fix: `dispose()` closes the state stream before calling `stop()`.
+* fix: `_parseInputDevices` truncates device names containing colons.
+* fix: pcm16bits support for file output.
+* fix: Code style improvements.
+
 ## 2.0.0
 * chore: Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
 

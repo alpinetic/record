@@ -38,7 +38,7 @@ External dependencies:
 | opus            | ✔️            |   ✔️ 4    |  ?       |         |         |  ✔️ 
 | wav             | ✔️ 2          |   ✔️    |   ✔️   |    ✔️    |   ✔️  |   ✔️ 
 | flac            | ✔️ 2          |    ✔️    |  ?     |  ✔️     |   ✔️   |   ✔️
-| pcm16bits       | ✔️ 2          |   ✔️    |  ✔️    |   ✔️    |  ✔️    |  
+| pcm16bits       | ✔️ 2          |   ✔️    |  ✔️    |   ✔️    |  ✔️    |  ✔️
 
 ?: from my testings:
 | Encoder         | Firefox    | Chrome based   | Safari
