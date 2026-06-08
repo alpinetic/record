@@ -36,7 +36,7 @@ class RecorderStreamDelegate: NSObject, AudioRecordingStreamDelegate {
       commonFormat: .pcmFormatInt16,
       sampleRate: Double(config.sampleRate),
       channels: AVAudioChannelCount(config.numChannels),
-      interleaved: true
+      interleaved: false
     )
 
     guard let dstFormat = m_outputFormat else {
