@@ -96,9 +96,8 @@ class AacAdtsEncoder: AudioEnc {
         }
       }
 
-      // Compact buffer when read index gets large
-      if pcmBufferReadIndex > 10000 {
-        pcmBuffer.removeFirst(pcmBufferReadIndex)
+      if pcmBufferReadIndex > 0 {
+        pcmBuffer = Array(pcmBuffer[pcmBufferReadIndex...])
         pcmBufferReadIndex = 0
       }
 
