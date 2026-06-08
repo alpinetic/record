@@ -1,15 +1,6 @@
 import AVFoundation
 
 extension AudioRecordingDelegate {
-  func getFileTypeFromSettings(_ settings: [String: Any]) -> AVFileType {
-    let formatId = settings[AVFormatIDKey] as! UInt32
-    switch formatId {
-    case kAudioFormatAMR, kAudioFormatAMR_WB: return .mobile3GPP
-    case kAudioFormatLinearPCM:               return .wav
-    default:                                  return .m4a
-    }
-  }
-
   func getInputSettings(config: RecordConfig) -> [String: Any]? {
     let session = AVAudioSession.sharedInstance()
     let sampleRate = session.sampleRate > 0 ? session.sampleRate : Double(config.sampleRate)

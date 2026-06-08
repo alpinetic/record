@@ -2,11 +2,6 @@ import AVFoundation
 
 /// Handles the audio processing pipeline for a stream recording session:
 /// PCM format conversion, amplitude tracking, and encoding (AAC or PCM16).
-///
-/// Created once per `start()` call. All `process()` calls come from the real-time
-/// audio tap thread; `dispose()` is called on `m_recorderQueue` after the tap is removed.
-/// The encoder's own lock (`AacAdtsEncoder.bufferLock`) guards the converter lifetime
-/// for the window between tap removal and dispose.
 class AudioStreamProcessor {
   private let m_converter: AVAudioConverter
   private let m_encoder: AudioEnc
