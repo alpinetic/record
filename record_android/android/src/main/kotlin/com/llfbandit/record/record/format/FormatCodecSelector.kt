@@ -4,8 +4,8 @@ import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.util.Range
-import com.llfbandit.record.record.RecordConfig
-import com.llfbandit.record.record.device.DeviceUtils
+import com.llfbandit.record.record.model.RecordConfig
+import com.llfbandit.record.record.util.DeviceUtils
 import com.llfbandit.record.record.encoder.EncoderListener
 import com.llfbandit.record.record.encoder.IEncoder
 import com.llfbandit.record.record.encoder.MediaCodecEncoder

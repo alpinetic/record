@@ -8,7 +8,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
-import com.llfbandit.record.record.device.DeviceUtils
+import com.llfbandit.record.record.util.DeviceUtils
 
 interface BluetoothScoListener {
   fun onBlScoConnected()

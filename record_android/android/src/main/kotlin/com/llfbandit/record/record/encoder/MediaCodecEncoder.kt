@@ -5,7 +5,7 @@ import android.media.MediaFormat
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
-import com.llfbandit.record.record.RecordConfig
+import com.llfbandit.record.record.model.RecordConfig
 import com.llfbandit.record.record.container.IContainerWriter
 import com.llfbandit.record.record.format.Format
 import java.util.LinkedList

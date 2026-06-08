@@ -1,9 +1,10 @@
-package com.llfbandit.record.record
+package com.llfbandit.record.record.audio_manager
 
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.NoiseSuppressor
 import android.util.Log
+import com.llfbandit.record.record.model.RecordConfig
 
 class AudioEffectsManager(private val audioSessionId: Int) : AutoCloseable {
   companion object {

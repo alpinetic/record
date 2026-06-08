@@ -1,8 +1,8 @@
-package com.llfbandit.record.methodcall
+package com.llfbandit.record
 
 import android.content.Context
-import com.llfbandit.record.record.RecordConfig
 import com.llfbandit.record.record.bluetooth.BluetoothManager
+import com.llfbandit.record.record.model.RecordConfig
 import com.llfbandit.record.record.recorder.AudioRecorder
 import com.llfbandit.record.record.recorder.IRecorder
 import com.llfbandit.record.record.recorder.MediaRecorder

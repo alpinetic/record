@@ -5,10 +5,10 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.llfbandit.record.Utils
-import com.llfbandit.record.record.AudioEncoder
-import com.llfbandit.record.record.RecordConfig
-import com.llfbandit.record.record.RecordState
+import com.llfbandit.record.record.util.Utils
+import com.llfbandit.record.record.model.AudioEncoder
+import com.llfbandit.record.record.model.RecordConfig
+import com.llfbandit.record.record.model.RecordState
 import com.llfbandit.record.record.stream.RecorderStateStreamHandler
 import java.io.IOException
 import kotlin.math.log10

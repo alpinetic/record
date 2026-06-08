@@ -1,21 +1,20 @@
-package com.llfbandit.record.methodcall
+package com.llfbandit.record
 
 import android.content.Context
 import com.llfbandit.record.permission.PermissionManager
-import com.llfbandit.record.record.RecordConfig
-import com.llfbandit.record.record.device.DeviceUtils
 import com.llfbandit.record.record.format.AudioFormats
+import com.llfbandit.record.record.model.RecordConfig
+import com.llfbandit.record.record.util.DeviceUtils
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import java.util.concurrent.ConcurrentHashMap
 
 class MethodCallHandlerImpl(
   private val permissionManager: PermissionManager,
   private val messenger: BinaryMessenger,
   private val appContext: Context
-) : MethodCallHandler {
+) : MethodChannel.MethodCallHandler {
   private val recorders = ConcurrentHashMap<String, RecorderWrapper>()
 
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

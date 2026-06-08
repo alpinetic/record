@@ -2,7 +2,7 @@ package com.llfbandit.record.record.format
 
 import android.media.MediaCodecList
 import android.media.MediaFormat
-import com.llfbandit.record.record.AudioEncoder
+import com.llfbandit.record.record.model.AudioEncoder
 
 object AudioFormats {
   fun isEncoderSupported(mimeType: String?): Boolean {

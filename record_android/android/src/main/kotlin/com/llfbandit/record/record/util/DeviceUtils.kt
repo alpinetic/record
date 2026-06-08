@@ -1,4 +1,4 @@
-package com.llfbandit.record.record.device
+package com.llfbandit.record.record.util
 
 import android.annotation.SuppressLint
 import android.content.Context

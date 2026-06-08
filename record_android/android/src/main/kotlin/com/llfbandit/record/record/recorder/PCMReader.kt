@@ -1,10 +1,12 @@
-package com.llfbandit.record.record
+package com.llfbandit.record.record.recorder
 
 import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaFormat
 import android.util.Log
+import com.llfbandit.record.record.audio_manager.AudioEffectsManager
+import com.llfbandit.record.record.model.RecordConfig
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs

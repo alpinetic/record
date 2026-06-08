@@ -1,6 +1,6 @@
 package com.llfbandit.record.record.recorder
 
-import com.llfbandit.record.record.RecordConfig
+import com.llfbandit.record.record.model.RecordConfig
 
 interface IRecorder {
   @Throws(Exception::class)

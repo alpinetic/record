@@ -1,8 +1,7 @@
 package com.llfbandit.record.record.recorder
 
-import com.llfbandit.record.Utils
-import com.llfbandit.record.record.PCMReader
-import com.llfbandit.record.record.RecordConfig
+import com.llfbandit.record.record.util.Utils
+import com.llfbandit.record.record.model.RecordConfig
 import com.llfbandit.record.record.encoder.EncoderListener
 import com.llfbandit.record.record.encoder.IEncoder
 import com.llfbandit.record.record.format.Format

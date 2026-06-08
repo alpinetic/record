@@ -2,7 +2,7 @@ package com.llfbandit.record.record.bluetooth
 
 import android.content.Context
 import android.media.AudioDeviceInfo
-import com.llfbandit.record.record.RecordConfig
+import com.llfbandit.record.record.model.RecordConfig
 
 class BluetoothManager(private val context: Context) {
   private var receiver: BluetoothReceiver? = null

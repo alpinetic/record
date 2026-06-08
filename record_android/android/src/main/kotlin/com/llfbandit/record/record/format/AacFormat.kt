@@ -3,8 +3,8 @@ package com.llfbandit.record.record.format
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import com.llfbandit.record.record.AudioEncoder
-import com.llfbandit.record.record.RecordConfig
+import com.llfbandit.record.record.model.AudioEncoder
+import com.llfbandit.record.record.model.RecordConfig
 import com.llfbandit.record.record.container.AdtsContainer
 import com.llfbandit.record.record.container.IContainerWriter
 import com.llfbandit.record.record.container.MuxerContainer

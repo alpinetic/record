@@ -1,12 +1,12 @@
-package com.llfbandit.record.record
+package com.llfbandit.record.record.model
 
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaRecorder
 import android.os.Build
-import com.llfbandit.record.Utils
-import com.llfbandit.record.record.device.DeviceUtils
+import com.llfbandit.record.record.util.Utils
+import com.llfbandit.record.record.util.DeviceUtils
 import io.flutter.plugin.common.MethodCall
 
 class RecordConfig(

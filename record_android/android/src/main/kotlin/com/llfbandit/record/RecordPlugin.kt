@@ -1,6 +1,5 @@
 package com.llfbandit.record
 
-import com.llfbandit.record.methodcall.MethodCallHandlerImpl
 import com.llfbandit.record.permission.PermissionManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding

@@ -2,9 +2,10 @@ package com.llfbandit.record.record.recorder
 
 import android.content.Context
 import android.util.Log
-import com.llfbandit.record.record.AudioInterruption
-import com.llfbandit.record.record.RecordConfig
-import com.llfbandit.record.record.RecordState
+import com.llfbandit.record.record.model.AudioInterruption
+import com.llfbandit.record.record.model.RecordConfig
+import com.llfbandit.record.record.model.RecordState
+import com.llfbandit.record.record.audio_manager.AudioSessionManager
 import com.llfbandit.record.record.stream.RecorderRecordStreamHandler
 import com.llfbandit.record.record.stream.RecorderStateStreamHandler
 

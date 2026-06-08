@@ -2,7 +2,7 @@ package com.llfbandit.record.record.stream
 
 import android.os.Handler
 import android.os.Looper
-import com.llfbandit.record.record.RecordState
+import com.llfbandit.record.record.model.RecordState
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.EventChannel.EventSink
 

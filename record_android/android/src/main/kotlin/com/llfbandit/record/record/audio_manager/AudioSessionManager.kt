@@ -1,4 +1,4 @@
-package com.llfbandit.record.record.recorder
+package com.llfbandit.record.record.audio_manager
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -7,8 +7,8 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import com.llfbandit.record.record.AudioInterruption
-import com.llfbandit.record.record.RecordConfig
+import com.llfbandit.record.record.model.AudioInterruption
+import com.llfbandit.record.record.model.RecordConfig
 
 class AudioSessionManager(
   context: Context,

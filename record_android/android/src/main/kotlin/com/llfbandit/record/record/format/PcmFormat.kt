@@ -1,7 +1,7 @@
 package com.llfbandit.record.record.format
 
 import android.media.MediaFormat
-import com.llfbandit.record.record.RecordConfig
+import com.llfbandit.record.record.model.RecordConfig
 import com.llfbandit.record.record.container.IContainerWriter
 import com.llfbandit.record.record.container.RawContainer
 
