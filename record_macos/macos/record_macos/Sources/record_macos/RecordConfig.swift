@@ -14,9 +14,9 @@ public enum AudioEncoder: String {
 
 public class RecordConfig {
   let encoder: String
-  let bitRate: Int
-  let sampleRate: Int
-  let numChannels: Int
+  var bitRate: Int
+  var sampleRate: Int
+  var numChannels: Int
   let device: Device?
   let autoGain: Bool
   let echoCancel: Bool
@@ -64,5 +64,25 @@ public class Device {
       "id": id,
       "label": label
     ]
+  }
+}
+
+extension RecordConfig {
+  static func from(_ args: [String: Any]) throws -> RecordConfig {
+    guard let encoder = args["encoder"] as? String else {
+      throw RecorderError.error(message: "Call missing mandatory parameter encoder.", details: nil)
+    }
+    let device = (args["device"] as? [String: Any]).map(Device.init(map:))
+    return RecordConfig(
+      encoder: encoder,
+      bitRate: args["bitRate"] as? Int ?? 128000,
+      sampleRate: args["sampleRate"] as? Int ?? 44100,
+      numChannels: args["numChannels"] as? Int ?? 2,
+      device: device,
+      autoGain: args["autoGain"] as? Bool ?? false,
+      echoCancel: args["echoCancel"] as? Bool ?? false,
+      noiseSuppress: args["noiseSuppress"] as? Bool ?? false,
+      streamBufferSize: args["streamBufferSize"] as? Int
+    )
   }
 }

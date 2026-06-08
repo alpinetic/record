@@ -2,151 +2,122 @@ import Foundation
 import AVFoundation
 
 class Recorder {
+  private let minAmplitudeDB: Float = -160.0
   private var m_maxAmplitude: Float = -160.0
-  private var m_state: RecordState = RecordState.stop
-  
+  private var m_state: RecordState = .stop
+
+  private let m_queue: DispatchQueue
+
   private var m_stateEventHandler: StateStreamHandler
   private var m_recordEventHandler: RecordStreamHandler
-  
+
   private var m_delegate: AudioRecordingDelegate?
-  
-  init(stateEventHandler: StateStreamHandler, recordEventHandler: RecordStreamHandler) {
+
+  init(queue: DispatchQueue, stateEventHandler: StateStreamHandler, recordEventHandler: RecordStreamHandler) {
+    m_queue = queue
     m_stateEventHandler = stateEventHandler
     m_recordEventHandler = recordEventHandler
   }
 
+  // MARK: - All methods below are called on m_queue (via withRecorder in the plugin)
+
   func dispose() {
-    stop(completionHandler: {(path) -> () in })
-  }
-  
-  func start(config: RecordConfig, path: String) throws {
-    stop(completionHandler: {(path) -> () in })
-    
-    if !isEncoderSupported(config.encoder) {
-      throw RecorderError.error(
-        message: "Failed to start recording",
-        details: "\(config.encoder) not supported."
-      )
-    }
-    
-    let delegate = RecorderFileDelegate(
-      onPause: {() -> () in self.updateState(RecordState.pause)},
-      onStop: {() -> () in self.updateState(RecordState.stop)}
-    )
-    
-    try delegate.start(config: config, path: path)
-    
-    self.m_delegate = delegate
-    
-    updateState(RecordState.record)
-  }
-  
-  func startStream(config: RecordConfig) throws {
-    stop(completionHandler: {(path) -> () in })
-    
-    if config.encoder != AudioEncoder.pcm16bits.rawValue && config.encoder != AudioEncoder.aacLc.rawValue {
-      throw RecorderError.error(
-        message: "Failed to start recording",
-        details: "\(config.encoder) not supported in streaming mode."
-      )
-    }
-    
-    let delegate = RecorderStreamDelegate(
-      onPause: {() -> () in self.updateState(RecordState.pause)},
-      onStop: {() -> () in self.updateState(RecordState.stop)}
-    )
-    
-    try delegate.start(config: config, recordEventHandler: m_recordEventHandler)
-    
-    self.m_delegate = delegate
-    
-    updateState(RecordState.record)
+    _ = stop()
   }
 
-  func stop(completionHandler: @escaping (_ path: String?) -> ()) {
-    if isRecording() {
-      m_delegate?.stop(completionHandler: {(path) -> () in
-        completionHandler(path)
-        self.updateState(RecordState.stop)
-      })
-    } else {
-      completionHandler(nil)
-      updateState(RecordState.stop)
+  func start(config: RecordConfig, path: String) throws {
+    _ = stop()
+
+    guard isEncoderSupported(config.encoder) else {
+      throw RecorderError.error(message: "Failed to start recording", details: "\(config.encoder) not supported.")
     }
+
+    let delegate = RecorderFileDelegate(
+      queue: m_queue,
+      onRecord: { [weak self] in self?.updateState(.record) },
+      onPause:  { [weak self] in self?.updateState(.pause)  },
+      onStop:   { [weak self] in self?.updateState(.stop)   }
+    )
+    try delegate.start(config: config, path: path)
+    m_delegate = delegate
   }
-  
+
+  func startStream(config: RecordConfig) throws {
+    _ = stop()
+
+    guard config.encoder == AudioEncoder.pcm16bits.rawValue || config.encoder == AudioEncoder.aacLc.rawValue else {
+      throw RecorderError.error(message: "Failed to start recording", details: "\(config.encoder) not supported in streaming mode.")
+    }
+
+    let delegate = RecorderStreamDelegate(
+      queue: m_queue,
+      onRecord: { [weak self] in self?.updateState(.record) },
+      onPause:  { [weak self] in self?.updateState(.pause)  },
+      onStop:   { [weak self] in self?.updateState(.stop)   }
+    )
+    try delegate.start(config: config, recordEventHandler: m_recordEventHandler)
+    m_delegate = delegate
+  }
+
+  @discardableResult
+  func stop() -> String? {
+    guard m_state != .stop else { return nil }
+    let path = m_delegate?.stop()
+    m_maxAmplitude = minAmplitudeDB
+    return path
+  }
+
   func pause() {
-    if m_state == .record {
-      m_delegate?.pause()
-      updateState(RecordState.pause)
+    guard m_state == .record else { return }
+    m_delegate?.pause()
+  }
+
+  func resume() throws {
+    guard m_state == .pause else { return }
+    try m_delegate?.resume()
+  }
+
+  func isPaused() -> Bool { m_state == .pause }
+  func isRecording() -> Bool { m_state != .stop }
+
+  func listInputDevices() throws -> [Device] { try listInputs() }
+
+  func getAmplitude() -> [String: Float] {
+    var amp = ["current": minAmplitudeDB, "max": minAmplitudeDB]
+    if let current = m_delegate?.getAmplitude() {
+      if current > m_maxAmplitude { m_maxAmplitude = current }
+      amp["current"] = min(0.0, max(current, minAmplitudeDB))
+      amp["max"]     = min(0.0, max(m_maxAmplitude, minAmplitudeDB))
     }
-  }
-  
-  func resume()  throws {
-    if isPaused() {
-      try m_delegate?.resume()
-      updateState(RecordState.record)
-    }
-  }
-  
-  func isPaused() -> Bool {
-    return m_state == .pause
-  }
-  
-  func isRecording() -> Bool {
-    return m_state != .stop
-  }
-  
-  func listInputDevices() throws -> [Device] {
-    return try listInputs()
-  }
-  
-  func getAmplitude() -> [String : Float] {
-    var amp = ["current" : -160.0, "max" : -160.0] as [String : Float]
-    
-    let current = m_delegate?.getAmplitude()
-    if let current = current {
-      if (current > m_maxAmplitude) {
-        m_maxAmplitude = current
-      }
-      
-      amp["current"] = min(0.0, max(current, -160.0))
-      amp["max"] = min(0.0, max(m_maxAmplitude, -160.0))
-    }
-    
     return amp
   }
-  
+
   func cancel() throws {
-    if isRecording() {
-      try m_delegate?.cancel()
-    }
-  }
-
-  private func updateState(_ state: RecordState) {
-    if (m_state == state) {
-      return
-    }
-
-    m_state = state
-    
-    if let eventSink = m_stateEventHandler.eventSink {
-      DispatchQueue.main.async {
-        eventSink(state.rawValue)
-      }
-    }
+    guard m_state != .stop else { return }
+    try m_delegate?.cancel()
   }
 
   func isEncoderSupported(_ encoder: String) -> Bool {
-    switch(encoder) {
+    switch encoder {
     case AudioEncoder.aacLc.rawValue,
-      AudioEncoder.aacEld.rawValue, /*"aacHe", "amrNb", "amrWb", "opus",*/
-      AudioEncoder.flac.rawValue,
-      AudioEncoder.pcm16bits.rawValue,
-      AudioEncoder.wav.rawValue:
+         AudioEncoder.aacEld.rawValue,
+         AudioEncoder.flac.rawValue,
+         AudioEncoder.opus.rawValue,
+         AudioEncoder.pcm16bits.rawValue,
+         AudioEncoder.wav.rawValue:
       return true
     default:
       return false
+    }
+  }
+
+  // MARK: - Private
+
+  private func updateState(_ state: RecordState) {
+    guard m_state != state else { return }
+    m_state = state
+    if let sink = m_stateEventHandler.eventSink {
+      DispatchQueue.main.async { sink(state.rawValue) }
     }
   }
 }

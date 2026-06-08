@@ -2,26 +2,36 @@ import AVFoundation
 import Foundation
 
 class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVCaptureFileOutputRecordingDelegate {
+  var config: RecordConfig?
+
   private var m_audioSession: AVCaptureSession?
   private var m_audioOutput: AVCaptureAudioFileOutput?
   private var m_path: String?
-  private var m_amplitude:Float = -160.0
-  private var m_stopCb: ((String?) -> ())?
-  
-  init(onPause: @escaping () -> (), onStop: @escaping () -> ()) {}
-  
+  private var m_stoppingIntentionally = false
+  private let m_queue: DispatchQueue
+  private var m_onRecord: () -> ()
+  private var m_onPause: () -> ()
+  private var m_onStop: () -> ()
+
+  init(queue: DispatchQueue, onRecord: @escaping () -> (), onPause: @escaping () -> (), onStop: @escaping () -> ()) {
+    m_queue = queue
+    m_onRecord = onRecord
+    m_onPause = onPause
+    m_onStop = onStop
+  }
+
   func start(config: RecordConfig, path: String) throws {
     try deleteFile(path: path)
-    
+
     let audioSession = AVCaptureSession()
-    
+
     let dev: AVCaptureInput?
     do {
       dev = try getInputDevice(device: config.device)
     } catch {
       throw RecorderError.error(message: "Failed to start recording", details: "\(error)")
     }
-  
+
     guard let dev = dev else {
       throw RecorderError.error(
         message: "Failed to start recording",
@@ -34,21 +44,17 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVCaptureFileO
         details: "Input device cannot be added to the capture session."
       )
     }
-    
-    audioSession.beginConfiguration()
 
-    // Add input device
+    audioSession.beginConfiguration()
     audioSession.addInput(dev)
-    // Add output
+
     let audioOutput = AVCaptureAudioFileOutput()
     audioSession.addOutput(audioOutput)
 
-    // Set audioSettings *after* adding to session, otherwise it is ignored
     let outputSettings = try getOutputSettings(config: config)
     audioOutput.audioSettings = outputSettings
-    
+
     audioSession.commitConfiguration()
-    
     audioSession.startRunning()
 
     audioOutput.startRecording(
@@ -56,79 +62,79 @@ class RecorderFileDelegate: NSObject, AudioRecordingFileDelegate, AVCaptureFileO
       outputFileType: getFileTypeFromSettings(outputSettings),
       recordingDelegate: self
     )
-    
+
     m_audioOutput = audioOutput
     m_audioSession = audioSession
     m_path = path
+    self.config = config
+
+    m_onRecord()
   }
-  
-  func stop(completionHandler: @escaping (String?) -> ()) {
+
+  func stop() -> String? {
+    m_stoppingIntentionally = true
     m_audioOutput?.stopRecording()
     m_audioOutput = nil
     m_audioSession?.stopRunning()
     m_audioSession = nil
-    
-    m_stopCb = completionHandler
+
+    let path = m_path
+    m_path = nil
+    config = nil
+
+    m_onStop()
+    return path
   }
-  
+
   func pause() {
-    m_audioOutput?.pauseRecording()
+    guard let output = m_audioOutput else { return }
+    output.pauseRecording()
+    m_onPause()
   }
 
-  func resume() {
-    m_audioOutput?.resumeRecording()
+  func resume() throws {
+    guard let output = m_audioOutput else { return }
+    output.resumeRecording()
+    m_onRecord()
   }
-  
+
   func cancel() throws {
-    stop { _ in
-      do {
-        guard let path = self.m_path else { return }
-        try self.deleteFile(path: path)
-      } catch {
-        print(error)
-      }
-    }
+    guard let path = m_path else { return }
+    _ = stop()
+    try deleteFile(path: path)
   }
-  
-  func getAmplitude() -> Float {
-    var current: Float?
-    if let audioOutput = m_audioOutput {
-      current = audioOutput.connections.first?.audioChannels.first?.averagePowerLevel
-    }
-    
-    return current ?? -160
-  }
-  
-  func dispose() {
-    stop { path in }
-  }
-  
-  public func fileOutput(_ output: AVCaptureFileOutput,
-                         didFinishRecordingTo outputFileURL: URL,
-                         from connections: [AVCaptureConnection],
-                         error: Error?) {
-    if let error = error as? NSError,
-       let success = error.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool,
-       !success {
-      print(error)
-    }
 
-    m_stopCb?(m_path)
-    m_stopCb = nil
+  func getAmplitude() -> Float {
+    return m_audioOutput?.connections.first?.audioChannels.first?.averagePowerLevel ?? -160
   }
-  
-  private func deleteFile(path: String) throws {
-    do {
-      let fileManager = FileManager.default
-      
-      if fileManager.fileExists(atPath: path) {
-        try fileManager.removeItem(atPath: path)
+
+  func dispose() {
+    _ = stop()
+  }
+
+  public func fileOutput(
+    _ output: AVCaptureFileOutput,
+    didFinishRecordingTo outputFileURL: URL,
+    from connections: [AVCaptureConnection],
+    error: Error?
+  ) {
+    m_queue.async {
+      if self.m_stoppingIntentionally {
+        self.m_stoppingIntentionally = false
+        return
       }
+      // System-terminated recording (disk full, audio route loss, etc.) — clean up state.
+      _ = self.stop()
+    }
+  }
+
+  private func deleteFile(path: String) throws {
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: path) else { return }
+    do {
+      try fileManager.removeItem(atPath: path)
     } catch {
-      throw RecorderError.error(
-        message: "Failed to delete recording",
-        details: error.localizedDescription
-      )
+      throw RecorderError.error(message: "Failed to delete previous recording", details: error.localizedDescription)
     }
   }
 }
