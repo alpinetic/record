@@ -111,18 +111,18 @@ namespace record_windows
 	{
 		HRESULT hr = EndRecording();
 
+		if (SUCCEEDED(hr) && !m_mfStarted)
+		{
+			hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
+		}
+		if (SUCCEEDED(hr))
+		{
+			m_mfStarted = true;
+			hr = AudioDevice::AdjustConfigToCodecCaps(*config);
+		}
 		if (SUCCEEDED(hr))
 		{
 			m_pConfig = std::move(config);
-
-			if (!m_mfStarted)
-			{
-				hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-			}
-			if (SUCCEEDED(hr))
-			{
-				m_mfStarted = true;
-			}
 		}
 
 		if (SUCCEEDED(hr))
