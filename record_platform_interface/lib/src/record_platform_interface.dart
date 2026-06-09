@@ -106,6 +106,15 @@ abstract class RecordEventChannelPlatformInterface {
   ///
   /// Provides pause, resume and stop states.
   Stream<RecordState> onStateChanged(String recorderId);
+
+  /// Sets a callback invoked when the platform adjusted the requested [RecordConfig].
+  ///
+  /// Called only when at least one field differs from what was requested.
+  /// Pass [null] to unregister.
+  void setOnConfigChanged(
+    String recorderId,
+    void Function(RecordConfig config)? handler,
+  );
 }
 
 /// iOS platform specific methods.

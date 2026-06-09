@@ -79,7 +79,8 @@ public class RecordMacOsPlugin: NSObject, FlutterPlugin {
     let recordEventHandler = RecordStreamHandler()
     recordEventChannel.setStreamHandler(recordEventHandler)
 
-    let recorder = Recorder(queue: m_recorderQueue, stateEventHandler: stateEventHandler, recordEventHandler: recordEventHandler)
+    let configChangedChannel = FlutterMethodChannel(name: "com.llfbandit.record/configChanged/\(recorderId)", binaryMessenger: m_binaryMessenger)
+    let recorder = Recorder(queue: m_recorderQueue, stateEventHandler: stateEventHandler, recordEventHandler: recordEventHandler, configChangedChannel: configChangedChannel)
 
     m_recorderQueue.async {
       self.m_recorders[recorderId]?.dispose()
@@ -93,11 +94,11 @@ public class RecordMacOsPlugin: NSObject, FlutterPlugin {
       DispatchQueue.main.async { result(FlutterError(code: "record", message: "Call missing mandatory parameter path.", details: nil)) }
       return
     }
-    run(result: result) { try recorder.start(config: try RecordConfig.from(args), path: path) }
+    run(result: result) { try recorder.start(config: try RecordConfig.fromMap(args), path: path) }
   }
 
   private func handleStartStream(recorder: Recorder, args: [String: Any], result: @escaping FlutterResult) {
-    run(result: result) { try recorder.startStream(config: try RecordConfig.from(args)) }
+    run(result: result) { try recorder.startStream(config: try RecordConfig.fromMap(args)) }
   }
 
   private func handleStop(recorder: Recorder, result: @escaping FlutterResult) {

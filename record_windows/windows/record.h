@@ -27,6 +27,8 @@ namespace record_windows
 		Recorder(EventStreamHandler<>* stateEventHandler, EventStreamHandler<>* recordEventHandler);
 		virtual ~Recorder();
 
+		void SetOnConfigChanged(std::function<void(const RecordConfig&)> callback);
+
 		HRESULT Start(std::unique_ptr<RecordConfig> config, std::wstring path);
 		HRESULT StartStream(std::unique_ptr<RecordConfig> config);
 		HRESULT Pause();
@@ -78,6 +80,7 @@ namespace record_windows
 
 		EventStreamHandler<>* m_stateEventHandler;
 		EventStreamHandler<>* m_recordEventHandler;
+		std::function<void(const RecordConfig&)> m_onConfigChanged;
 
 		RecordState                m_recordState = RecordState::stop;
 		std::unique_ptr<RecordConfig> m_pConfig;

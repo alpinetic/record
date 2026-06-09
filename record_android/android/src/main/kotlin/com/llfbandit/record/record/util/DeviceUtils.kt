@@ -12,23 +12,7 @@ import android.os.Build
 class DeviceUtils {
   companion object {
     fun listInputDevicesAsMap(context: Context): List<Map<String, String>> {
-      val devices = listInputDevices(context).map {
-        val label = StringBuilder()
-        label.apply {
-          append(it.productName)
-          append(" (")
-          append(typeToString(it.type))
-          if (Build.VERSION.SDK_INT >= 28) append(", ${it.address}")
-          append(")")
-        }
-
-        mapOf(
-          "id" to "${it.id}",
-          "label" to label.toString(),
-        )
-      }
-
-      return devices
+      return listInputDevices(context).map { deviceInfoToMap(it) }
     }
 
     private fun listInputDevices(context: Context): List<AudioDeviceInfo> {
@@ -36,6 +20,17 @@ class DeviceUtils {
       val devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
 
       return filterSources(devices.asList())
+    }
+
+    private fun deviceInfoToMap(device: AudioDeviceInfo): Map<String, String> {
+      val label = buildString {
+        append(device.productName)
+        append(" (")
+        append(typeToString(device.type))
+        if (Build.VERSION.SDK_INT >= 28) append(", ${device.address}")
+        append(")")
+      }
+      return mapOf("id" to "${device.id}", "label" to label)
     }
 
     fun deviceInfoFromMap(context: Context, device: Map<String, String>?): AudioDeviceInfo? {

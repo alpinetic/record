@@ -79,6 +79,7 @@ namespace record_windows {
 		// stored by Recorder remain valid while the recorder exists.
 		std::map<std::string, std::unique_ptr<EventChannel<EncodableValue>>> m_state_event_channels{};
 		std::map<std::string, std::unique_ptr<EventChannel<EncodableValue>>> m_record_event_channels{};
+		std::map<std::string, std::unique_ptr<MethodChannel<EncodableValue>>> m_config_changed_channels{};
 
 		// Shared liveness flag: set to false in the destructor so any lambdas
 		// still queued in RunOnMainThread that capture `this` can skip safely.

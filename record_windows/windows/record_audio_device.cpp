@@ -4,6 +4,7 @@
 
 #include <mfapi.h>
 #include <mfidl.h>
+#include <mfreadwrite.h>
 #include <mftransform.h>
 #include <vector>
 
@@ -120,6 +121,83 @@ HRESULT IsEncoderSupported(const std::string& encoderName, bool* supported)
 
 	MFShutdown();
 	return hr;
+}
+
+HRESULT AdjustConfigToDeviceCaps(RecordConfig& config)
+{
+	IMFAttributes*   pAttributes = NULL;
+	IMFMediaSource*  pSource     = NULL;
+	IMFSourceReader* pReader     = NULL;
+
+	HRESULT hr = MFCreateAttributes(&pAttributes, 2);
+
+	if (SUCCEEDED(hr))
+	{
+		hr = pAttributes->SetGUID(
+			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID
+		);
+	}
+	if (SUCCEEDED(hr) && !config.deviceId.empty())
+	{
+		auto deviceId = std::wstring(config.deviceId.begin(), config.deviceId.end());
+		hr = pAttributes->SetString(
+			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_ENDPOINT_ID,
+			deviceId.c_str()
+		);
+	}
+	if (SUCCEEDED(hr))
+	{
+		hr = MFCreateDeviceSource(pAttributes, &pSource);
+	}
+	if (SUCCEEDED(hr))
+	{
+		hr = MFCreateSourceReaderFromMediaSource(pSource, NULL, &pReader);
+	}
+	if (SUCCEEDED(hr))
+	{
+		std::vector<UINT32> channels;
+
+		for (DWORD i = 0; ; i++)
+		{
+			IMFMediaType* pType = NULL;
+			if (FAILED(pReader->GetNativeMediaType(
+					(DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, i, &pType)))
+				break;
+
+			GUID subtype = GUID_NULL;
+			pType->GetGUID(MF_MT_SUBTYPE, &subtype);
+
+			if (subtype == MFAudioFormat_PCM || subtype == MFAudioFormat_Float)
+			{
+				UINT32 ch = 0;
+				pType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &ch);
+				if (ch > 0) channels.push_back(ch);
+			}
+			SafeRelease(&pType);
+		}
+
+		if (!channels.empty())
+		{
+			const UINT32 reqCh = (UINT32)config.numChannels;
+
+			UINT32 bestCh = channels[0];
+			for (UINT32 ch : channels)
+			{
+				UINT32 a = ch    >= reqCh ? ch    - reqCh : reqCh - ch;
+				UINT32 b = bestCh >= reqCh ? bestCh - reqCh : reqCh - bestCh;
+				if (a < b) bestCh = ch;
+			}
+
+			config.numChannels = (int)bestCh;
+		}
+	}
+
+	SafeRelease(&pReader);
+	SafeRelease(&pSource);
+	SafeRelease(&pAttributes);
+
+	return S_OK; // non-fatal
 }
 
 HRESULT AdjustConfigToCodecCaps(RecordConfig& config)

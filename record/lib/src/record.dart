@@ -101,6 +101,17 @@ class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
     });
   }
 
+  /// Sets a callback invoked when the platform adjusted the requested [RecordConfig]
+  /// to match hardware or codec constraints.
+  ///
+  /// Only called when at least one field differs from what was requested.
+  /// Pass [null] to unregister.
+  Future<void> setOnConfigChanged(void Function(RecordConfig config)? callback) {
+    return _safeCall(() async {
+      _platform.setOnConfigChanged(_recorderId, callback);
+    });
+  }
+
   /// Listen to recorder states [RecordState].
   ///
   /// Provides pause, resume and stop states.

@@ -246,6 +246,7 @@ namespace record_windows {
 				m_recorders.erase(recorderId);
 				m_state_event_channels.erase(recorderId);
 				m_record_event_channels.erase(recorderId);
+				m_config_changed_channels.erase(recorderId);
 			});
 
 			result->Success(EncodableValue());
@@ -354,15 +355,39 @@ namespace record_windows {
 		std::unique_ptr<StreamHandler<EncodableValue>> pRecordEventHandler{static_cast<StreamHandler<EncodableValue>*>(eventRecordHandler)};
 		eventRecordChannel->SetStreamHandler(std::move(pRecordEventHandler));
 
+		// Config-changed method channel
+		auto configChangedChannel = std::make_unique<MethodChannel<EncodableValue>>(
+			m_binaryMessenger, "com.llfbandit.record/configChanged/" + recorderId,
+			&StandardMethodCodec::GetInstance());
+
 		Recorder* pRecorder = NULL;
 
 		HRESULT hr = Recorder::CreateInstance(eventHandler, eventRecordHandler, &pRecorder);
 		if (SUCCEEDED(hr))
 		{
+			auto* pChannel = configChangedChannel.get();
+			pRecorder->SetOnConfigChanged([pChannel](const RecordConfig& cfg) {
+				EncodableMap args = {
+					{EncodableValue("encoder"),         EncodableValue(cfg.encoderName)},
+					{EncodableValue("bitRate"),         EncodableValue(cfg.bitRate)},
+					{EncodableValue("sampleRate"),      EncodableValue(cfg.sampleRate)},
+					{EncodableValue("numChannels"),     EncodableValue(cfg.numChannels)},
+					{EncodableValue("device"),          EncodableValue()},
+					{EncodableValue("autoGain"),        EncodableValue(cfg.autoGain)},
+					{EncodableValue("echoCancel"),      EncodableValue(cfg.echoCancel)},
+					{EncodableValue("noiseSuppress"),   EncodableValue(cfg.noiseSuppress)},
+					{EncodableValue("audioInterruption"), EncodableValue(1)},
+					{EncodableValue("streamBufferSize"), EncodableValue()},
+				};
+				pChannel->InvokeMethod("onConfigChanged",
+					std::make_unique<EncodableValue>(EncodableMap(std::move(args))));
+			});
+
 			// Keep channels alive for the recorder lifetime so handler pointers
 			// held by the recorder remain valid.
 			m_state_event_channels.insert(std::make_pair(recorderId, std::move(eventChannel)));
 			m_record_event_channels.insert(std::make_pair(recorderId, std::move(eventRecordChannel)));
+			m_config_changed_channels.insert(std::make_pair(recorderId, std::move(configChangedChannel)));
 			m_recorders.insert(std::make_pair(recorderId, std::move(pRecorder)));
 		}
 

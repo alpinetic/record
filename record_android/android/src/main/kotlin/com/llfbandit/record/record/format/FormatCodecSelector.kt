@@ -101,11 +101,6 @@ internal object FormatCodecSelector {
     val device = config.device ?: DeviceUtils.getDefaultInputDevice()
 
     device?.let {
-      val deviceSampleRates = it.sampleRates
-      if (deviceSampleRates.isNotEmpty()) {
-        format.adjustSampleRate(mediaFormat, nearestValue(deviceSampleRates, config.sampleRate))
-      }
-
       val deviceChannelCounts = it.channelCounts
       if (deviceChannelCounts.isNotEmpty()) {
         format.adjustNumChannels(mediaFormat, nearestValue(deviceChannelCounts, config.numChannels))

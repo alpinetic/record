@@ -14,7 +14,7 @@ class RecordConfig(
   encoder: String,
   var bitRate: Int,
   var sampleRate: Int,
-  numChannels: Int,
+  var numChannels: Int,
   val device: AudioDeviceInfo?,
   val autoGain: Boolean = false,
   val echoCancel: Boolean = false,
@@ -26,9 +26,9 @@ class RecordConfig(
   val speakerphone: Boolean = false,
   val audioManagerMode: Int = AudioManager.MODE_NORMAL,
   audioInterruption: Int,
-  val streamBufferSize: Int?
+  val streamBufferSize: Int?,
+  private val rawMap: Map<String, Any?> = emptyMap(),
 ) {
-  var numChannels: Int = 2.coerceAtMost(1.coerceAtLeast(numChannels))
   val audioInterruption: AudioInterruption = when (audioInterruption) {
     0 -> AudioInterruption.NONE
     1 -> AudioInterruption.PAUSE
@@ -36,21 +36,31 @@ class RecordConfig(
     else -> AudioInterruption.PAUSE
   }
 
-  val encoder: AudioEncoder = when (encoder) {
-    "aacLc" -> AudioEncoder.AacLc
-    "aacEld" -> AudioEncoder.AacEld
-    "aacHe" -> AudioEncoder.AacHe
-    "amrNb" -> AudioEncoder.AmrNb
-    "amrWb" -> AudioEncoder.AmrWb
-    "flac" -> AudioEncoder.Flac
-    "pcm16bits" -> AudioEncoder.Pcm16bits
-    "opus" -> AudioEncoder.Opus
-    "wav" -> AudioEncoder.Wav
-    else -> AudioEncoder.AacLc
-  }
+  val encoder: AudioEncoder = AudioEncoder.from(encoder)
+
+  fun toMap(): Map<String, Any?> = rawMap + mapOf(
+    "sampleRate" to sampleRate,
+    "numChannels" to numChannels,
+    "bitRate" to bitRate,
+  )
+
+  fun copy() = RecordConfig(
+    path, encoder.value, bitRate, sampleRate, numChannels,
+    device, autoGain, echoCancel, noiseSuppress,
+    useLegacy, muteAudio, manageBluetoothSco, audioSource,
+    speakerphone, audioManagerMode, audioInterruption.ordinal,
+    streamBufferSize, rawMap,
+  )
+
+  fun isModified(other: RecordConfig): Boolean =
+    sampleRate != other.sampleRate ||
+    numChannels != other.numChannels ||
+    bitRate != other.bitRate
 
   companion object {
     fun fromMap(call: MethodCall, context: Context): RecordConfig {
+      val rawMap = (call.arguments as Map<*, *>).entries
+        .associate { (k, v) -> k.toString() to v }
       val map = call.argument("androidConfig") as Map<*, *>?
 
       val audioSource: Int = when (map?.get("audioSource")) {
@@ -124,7 +134,8 @@ class RecordConfig(
           call.argument("audioInterruption"),
           AudioInterruption.PAUSE.ordinal
         ),
-        call.argument("streamBufferSize")
+        call.argument("streamBufferSize"),
+        rawMap,
       )
     }
   }
@@ -139,7 +150,12 @@ enum class AudioEncoder(val value: String) {
   Flac("flac"),
   Pcm16bits("pcm16bits"),
   Opus("opus"),
-  Wav("wav")
+  Wav("wav");
+
+  companion object {
+    fun from(value: String): AudioEncoder =
+      entries.firstOrNull { it.value == value } ?: AacLc
+  }
 }
 
 enum class AudioInterruption {

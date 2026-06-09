@@ -55,6 +55,10 @@ class _RecorderState extends State<Recorder> with AudioRecorderMixin {
 
         const config = RecordConfig(encoder: encoder, numChannels: 1);
 
+        _audioRecorder.setOnConfigChanged(((config) {
+          debugPrint('Config changed:\n${config.toString()}');
+        }));
+
         // Record to file
         await recordFile(_audioRecorder, config);
 

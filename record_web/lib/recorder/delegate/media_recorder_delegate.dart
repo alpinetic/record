@@ -29,8 +29,9 @@ class MediaRecorderDelegate extends RecorderDelegate {
   web.MediaStreamAudioSourceNode? _source;
 
   final OnStateChanged onStateChanged;
+  final void Function(RecordConfig)? onConfigChanged;
 
-  MediaRecorderDelegate({required this.onStateChanged});
+  MediaRecorderDelegate({required this.onStateChanged, this.onConfigChanged});
 
   @override
   Future<void> dispose() async {
@@ -94,6 +95,13 @@ class MediaRecorderDelegate extends RecorderDelegate {
     try {
       final mediaStream = await initMediaStream(config);
 
+      final effectiveConfig = adjustConfig(
+        mediaStream,
+        config,
+        onConfigChanged,
+      );
+      config = effectiveConfig.config;
+
       // Try to assign dedicated mime type.
       final mimeType = getSupportedMimeType(config.encoder);
       if (mimeType == null) {
@@ -116,7 +124,7 @@ class MediaRecorderDelegate extends RecorderDelegate {
 
       mediaRecorder.start(200); // Will trigger dataavailable every 200ms
 
-      _createAudioContext(config, mediaStream);
+      _setupAmplitudeAnalyser(effectiveConfig, mediaStream);
 
       _mediaRecorder = mediaRecorder;
       _mediaStream = mediaStream;
@@ -190,7 +198,10 @@ class MediaRecorderDelegate extends RecorderDelegate {
           web.BlobPropertyBag(type: mimeType),
         );
         final blob = mimeType.startsWith('audio/webm')
-            ? await fixWebmDuration(mergedBlob, _elapsedTime.elapsedMilliseconds)
+            ? await fixWebmDuration(
+                mergedBlob,
+                _elapsedTime.elapsedMilliseconds,
+              )
             : mergedBlob;
 
         audioUrl = web.URL.createObjectURL(blob);
@@ -226,9 +237,10 @@ class MediaRecorderDelegate extends RecorderDelegate {
     _chunks = [];
   }
 
-  void _createAudioContext(RecordConfig config, web.MediaStream stream) {
-    final effectiveConfig = adjustConfig(stream, config);
-
+  void _setupAmplitudeAnalyser(
+    AdjustedConfig effectiveConfig,
+    web.MediaStream stream,
+  ) {
     final audioCtx = effectiveConfig.context;
 
     final source = audioCtx.createMediaStreamSource(stream);

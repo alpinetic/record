@@ -100,6 +100,14 @@ class RecordPluginWebWrapper extends RecordPlatform {
     return _getRecorder(recorderId).onStateChanged();
   }
 
+  @override
+  void setOnConfigChanged(
+    String recorderId,
+    void Function(RecordConfig)? handler,
+  ) {
+    _getRecorder(recorderId).setOnConfigChanged(handler);
+  }
+
   Recorder _getRecorder(String recorderId) {
     final recorder = _recorders[recorderId];
 

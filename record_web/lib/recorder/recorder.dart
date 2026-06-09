@@ -15,6 +15,7 @@ const kMinAmplitude = -160.0;
 class Recorder {
   RecorderDelegate? _delegate;
   StreamController<RecordState>? _stateStreamCtrl;
+  void Function(RecordConfig)? _onConfigChanged;
 
   Future<bool> _requestPermission() async {
     final mediaDevices = web.window.navigator.mediaDevices;
@@ -53,21 +54,23 @@ class Recorder {
   }
 
   Future<List<InputDevice>> listInputDevices() async {
-    final devices = <InputDevice>[];
-
     final mediaDevices = web.window.navigator.mediaDevices;
     try {
-      final deviceInfos = await mediaDevices.enumerateDevices().toDart;
-      for (var info in deviceInfos.toDart) {
-        if (info.kind == 'audioinput') {
-          devices.add(InputDevice(id: info.deviceId, label: info.label));
-        }
+      var deviceInfos = await mediaDevices.enumerateDevices().toDart;
+      var inputs = deviceInfos.toDart.where((d) => d.kind == 'audioinput').toList();
+
+      // Before permission is granted, browsers return devices without labels (or none at all).
+      if (inputs.isEmpty || inputs.every((d) => d.label.isEmpty)) {
+        await _requestPermission();
+        deviceInfos = await mediaDevices.enumerateDevices().toDart;
+        inputs = deviceInfos.toDart.where((d) => d.kind == 'audioinput').toList();
       }
+
+      return inputs.map((d) => InputDevice(id: d.deviceId, label: d.label)).toList();
     } catch (error) {
       debugPrint(error.toString());
+      return [];
     }
-
-    return devices;
   }
 
   Future<bool> isEncoderSupported(AudioEncoder encoder) {
@@ -142,7 +145,10 @@ class Recorder {
       case AudioEncoder.wav:
       case AudioEncoder.pcm16bits:
         await _delegate?.dispose();
-        _delegate = MicRecorderDelegate(onStateChanged: _updateState);
+        _delegate = MicRecorderDelegate(
+          onStateChanged: _updateState,
+          onConfigChanged: _onConfigChanged,
+        );
         return _delegate!.start(config, path: path);
       default:
         await _delegate?.dispose();
@@ -152,7 +158,10 @@ class Recorder {
           throw Exception('Encoder ${config.encoder} not supported.');
         }
 
-        _delegate = MediaRecorderDelegate(onStateChanged: _updateState);
+        _delegate = MediaRecorderDelegate(
+          onStateChanged: _updateState,
+          onConfigChanged: _onConfigChanged,
+        );
         return _delegate!.start(config, path: path);
     }
   }
@@ -163,7 +172,10 @@ class Recorder {
     switch (config.encoder) {
       case AudioEncoder.pcm16bits:
         await _delegate?.dispose();
-        _delegate = MicRecorderDelegate(onStateChanged: _updateState);
+        _delegate = MicRecorderDelegate(
+          onStateChanged: _updateState,
+          onConfigChanged: _onConfigChanged,
+        );
         return _delegate!.startStream(config);
       default:
         throw Exception('Stream not supported.');
@@ -186,6 +198,10 @@ class Recorder {
     if (url != null) {
       web.URL.revokeObjectURL(url);
     }
+  }
+
+  void setOnConfigChanged(void Function(RecordConfig)? handler) {
+    _onConfigChanged = handler;
   }
 
   Stream<RecordState> onStateChanged() {

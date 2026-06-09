@@ -41,6 +41,11 @@ namespace record_windows
 		Dispose();
 	}
 
+	void Recorder::SetOnConfigChanged(std::function<void(const RecordConfig&)> callback)
+	{
+		m_onConfigChanged = std::move(callback);
+	}
+
 	HRESULT Recorder::Start(std::unique_ptr<RecordConfig> config, std::wstring path)
 	{
 		bool supported = false;
@@ -118,7 +123,18 @@ namespace record_windows
 		if (SUCCEEDED(hr))
 		{
 			m_mfStarted = true;
+			const int origSampleRate  = config->sampleRate;
+			const int origNumChannels = config->numChannels;
+			const int origBitRate     = config->bitRate;
+			AudioDevice::AdjustConfigToDeviceCaps(*config);
 			hr = AudioDevice::AdjustConfigToCodecCaps(*config);
+			if (SUCCEEDED(hr) && m_onConfigChanged &&
+				(config->sampleRate  != origSampleRate ||
+				 config->numChannels != origNumChannels ||
+				 config->bitRate     != origBitRate))
+			{
+				m_onConfigChanged(*config);
+			}
 		}
 		if (SUCCEEDED(hr))
 		{
@@ -300,6 +316,7 @@ namespace record_windows
 
 		m_stateEventHandler = nullptr;
 		m_recordEventHandler = nullptr;
+		m_onConfigChanged = nullptr;
 
 		return hr;
 	}

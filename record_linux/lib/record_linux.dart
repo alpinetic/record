@@ -22,6 +22,7 @@ class RecordLinux extends RecordPlatform {
   StreamController<List<int>>? _inputPcmController;
   double _currentAmplitude = -160.0;
   double _maxAmplitude = -160.0;
+  void Function(RecordConfig config)? _configChangedHandler;
 
   @override
   Future<void> create(String recorderId) async {}
@@ -101,14 +102,20 @@ class RecordLinux extends RecordPlatform {
 
     _deleteFile(path);
 
+    final adjustedConfig = _adjustConfig(config);
+
     // Step 1: Use parecord to capture raw PCM audio from the microphone
     // We always capture raw PCM (not encoded) so we can calculate amplitude
-    final args = _getParecordArgs(config, path: null, canEncode: false);
+    final args = _getParecordArgs(adjustedConfig, path: null, canEncode: false);
     _parecordProcess = await Process.start(_parecordBin, args);
 
     // Step 2: Pipe the raw PCM through amplitude monitoring to ffmpeg for encoding
     // parecord (capture) -> amplitude calculation -> ffmpeg (encode to file)
-    await _startFfmpegWithAmplitudeMonitoring(config, _parecordProcess!, path);
+    await _startFfmpegWithAmplitudeMonitoring(
+      adjustedConfig,
+      _parecordProcess!,
+      path,
+    );
 
     _path = path;
     _updateState(RecordState.record);
@@ -121,7 +128,9 @@ class RecordLinux extends RecordPlatform {
   ) async {
     await stop(recorderId);
 
-    final args = _getParecordArgs(config);
+    final adjustedConfig = _adjustConfig(config);
+
+    final args = _getParecordArgs(adjustedConfig);
     _parecordProcess = await Process.start(_parecordBin, args);
 
     _updateState(RecordState.record);
@@ -203,6 +212,14 @@ class RecordLinux extends RecordPlatform {
     return _stateStreamCtrl!.stream;
   }
 
+  @override
+  void setOnConfigChanged(
+    String recorderId,
+    void Function(RecordConfig config)? handler,
+  ) {
+    _configChangedHandler = handler;
+  }
+
   void _deleteFile(String? path) {
     if (path == null) return;
 
@@ -224,13 +241,11 @@ class RecordLinux extends RecordPlatform {
     String? path,
     bool canEncode = false,
   }) {
-    final numChannels = _getNumChannels(config);
-
     final args = [
       '--raw',
       '--format=s16le',
       '--rate=${config.sampleRate}',
-      '--channels=$numChannels',
+      '--channels=${config.numChannels}',
       '--latency-msec=100',
       if (config.device != null) '--device=${config.device!.id}',
       if (config.autoGain) '--property=auto_gain_control=1',
@@ -240,10 +255,6 @@ class RecordLinux extends RecordPlatform {
     ];
 
     return args;
-  }
-
-  int _getNumChannels(RecordConfig config) {
-    return config.numChannels.clamp(1, 2);
   }
 
   List<String> _getFfmpegEncoderSettings(
@@ -357,6 +368,49 @@ class RecordLinux extends RecordPlatform {
     return devices;
   }
 
+  RecordConfig _adjustConfig(RecordConfig config) {
+    final sampleRate = _adjustSampleRate(config.encoder, config.sampleRate);
+    final numChannels = config.numChannels.clamp(1, 2);
+
+    if (sampleRate == config.sampleRate && numChannels == config.numChannels) {
+      return config;
+    }
+
+    config = config.copyWith(sampleRate: sampleRate, numChannels: numChannels);
+
+    _configChangedHandler?.call(config);
+
+    return config;
+  }
+
+  int _adjustSampleRate(AudioEncoder encoder, int sampleRate) {
+    final List<int> validRates;
+    switch (encoder) {
+      case AudioEncoder.opus:
+        validRates = const [8000, 12000, 16000, 24000, 48000];
+      case AudioEncoder.aacLc:
+        validRates = const [
+          8000,
+          11025,
+          12000,
+          16000,
+          22050,
+          24000,
+          32000,
+          44100,
+          48000,
+          64000,
+          88200,
+          96000,
+        ];
+      default:
+        return sampleRate;
+    }
+    return validRates.reduce(
+      (a, b) => (a - sampleRate).abs() <= (b - sampleRate).abs() ? a : b,
+    );
+  }
+
   void _updateState(RecordState state) {
     if (_state == state) return;
 
@@ -414,7 +468,7 @@ class RecordLinux extends RecordPlatform {
       '-ar',
       config.sampleRate.toString(),
       '-ac',
-      '${_getNumChannels(config)}',
+      '${config.numChannels}',
       '-i',
       '-',
       ..._getFfmpegEncoderSettings(config.encoder, path, config.bitRate),

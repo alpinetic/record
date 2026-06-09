@@ -40,8 +40,7 @@ class FakeRecordPlatform extends RecordPlatform {
   Future<void> create(String recorderId) async {
     calls.add('create');
     lastCreatedId = recorderId;
-    _stateControllers[recorderId] =
-        StreamController<RecordState>.broadcast();
+    _stateControllers[recorderId] = StreamController<RecordState>.broadcast();
     if (createException != null) throw createException!;
   }
 
@@ -90,10 +89,7 @@ class FakeRecordPlatform extends RecordPlatform {
   }
 
   @override
-  Future<bool> hasPermission(
-    String recorderId, {
-    bool request = true,
-  }) async {
+  Future<bool> hasPermission(String recorderId, {bool request = true}) async {
     calls.add('hasPermission');
     lastHasPermissionRequest = request;
     return hasPermissionResult;
@@ -135,5 +131,13 @@ class FakeRecordPlatform extends RecordPlatform {
   Stream<RecordState> onStateChanged(String recorderId) {
     calls.add('onStateChanged');
     return _stateControllers[recorderId]!.stream;
+  }
+
+  @override
+  void setOnConfigChanged(
+    String recorderId,
+    void Function(RecordConfig config)? handler,
+  ) {
+    calls.add('setOnConfigChanged');
   }
 }

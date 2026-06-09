@@ -8,15 +8,10 @@ import 'package:web/web.dart' as web;
 typedef OnStateChanged = void Function(RecordState state);
 
 class AdjustedConfig {
-  web.AudioContext context;
-  int numChannels;
+  final web.AudioContext context;
+  final RecordConfig config;
 
-  AdjustedConfig({
-    required this.context,
-    required this.numChannels,
-  });
-
-  num get sampleRate => context.sampleRate;
+  AdjustedConfig({required this.context, required this.config});
 }
 
 abstract class RecorderDelegate {
@@ -38,9 +33,7 @@ abstract class RecorderDelegate {
 
   Future<String?> stop();
 
-  Future<web.MediaStream> initMediaStream(
-    RecordConfig config,
-  ) async {
+  Future<web.MediaStream> initMediaStream(RecordConfig config) async {
     final constraints = web.MediaStreamConstraints(
       audio: {
         'autoGainControl': config.autoGain,
@@ -49,7 +42,7 @@ abstract class RecorderDelegate {
         'sampleRate': config.sampleRate,
         'sampleSize': 16,
         'channelCount': config.numChannels,
-        if (config.device case final device?) 'deviceId': {'exact': device.id}
+        if (config.device case final device?) 'deviceId': {'exact': device.id},
       }.jsify()!,
     );
 
@@ -58,25 +51,47 @@ abstract class RecorderDelegate {
 
   AdjustedConfig adjustConfig(
     web.MediaStream mediaStream,
-    RecordConfig config,
-  ) {
+    RecordConfig config, [
+    void Function(RecordConfig)? onConfigChanged,
+  ]) {
     final settings = _getTrackSettings(mediaStream);
-
-    final result = AdjustedConfig(
-      context: _adjustContext(settings),
-      numChannels: _adjustNumChannels(config, settings),
+    final context = _adjustContext(settings);
+    final numChannels = _adjustNumChannels(config, settings);
+    final autoGain = _adjustBoolSetting(
+      'autoGainControl',
+      config.autoGain,
+      settings,
+    );
+    final echoCancel = _adjustBoolSetting(
+      'echoCancellation',
+      config.echoCancel,
+      settings,
+    );
+    final noiseSuppress = _adjustBoolSetting(
+      'noiseSuppression',
+      config.noiseSuppress,
+      settings,
     );
 
-    if (kDebugMode) {
-      if (config.numChannels != result.numChannels) {
-        debugPrint('Channels adjusted to ${result.numChannels}');
-      }
-      if (config.sampleRate != result.sampleRate) {
-        debugPrint('Sample rate adjusted to ${result.sampleRate}');
-      }
+    final changed =
+        config.numChannels != numChannels ||
+        config.sampleRate != context.sampleRate.toInt() ||
+        config.autoGain != autoGain ||
+        config.echoCancel != echoCancel ||
+        config.noiseSuppress != noiseSuppress;
+
+    if (changed) {
+      config = config.copyWith(
+        sampleRate: context.sampleRate.toInt(),
+        numChannels: numChannels,
+        autoGain: autoGain,
+        echoCancel: echoCancel,
+        noiseSuppress: noiseSuppress,
+      );
+      onConfigChanged?.call(config);
     }
 
-    return result;
+    return AdjustedConfig(context: context, config: config);
   }
 
   web.AudioContext getContext(
@@ -138,5 +153,15 @@ abstract class RecorderDelegate {
     return settings.hasProperty('channelCount'.toJS).toDart
         ? settings.channelCount
         : config.numChannels;
+  }
+
+  bool _adjustBoolSetting(
+    String key,
+    bool fallback,
+    web.MediaTrackSettings settings,
+  ) {
+    return settings.hasProperty(key.toJS).toDart
+        ? settings.getProperty<JSBoolean>(key.toJS).toDart
+        : fallback;
   }
 }

@@ -90,6 +90,59 @@ class RecordConfig {
     this.streamBufferSize,
   });
 
+  RecordConfig copyWith({
+    AudioEncoder? encoder,
+    int? bitRate,
+    int? sampleRate,
+    int? numChannels,
+    ({InputDevice? value})? device,
+    bool? autoGain,
+    bool? echoCancel,
+    bool? noiseSuppress,
+    AndroidRecordConfig? androidConfig,
+    IosRecordConfig? iosConfig,
+    AudioInterruptionMode? audioInterruption,
+    ({int? value})? streamBufferSize,
+  }) {
+    return RecordConfig(
+      encoder: encoder ?? this.encoder,
+      bitRate: bitRate ?? this.bitRate,
+      sampleRate: sampleRate ?? this.sampleRate,
+      numChannels: numChannels ?? this.numChannels,
+      device: device != null ? device.value : this.device,
+      autoGain: autoGain ?? this.autoGain,
+      echoCancel: echoCancel ?? this.echoCancel,
+      noiseSuppress: noiseSuppress ?? this.noiseSuppress,
+      androidConfig: androidConfig ?? this.androidConfig,
+      iosConfig: iosConfig ?? this.iosConfig,
+      audioInterruption: audioInterruption ?? this.audioInterruption,
+      streamBufferSize:
+          streamBufferSize != null ? streamBufferSize.value : this.streamBufferSize,
+    );
+  }
+
+  factory RecordConfig.fromMap(Map map) {
+    return RecordConfig(
+      encoder: AudioEncoder.values.firstWhere(
+        (e) => e.name == map['encoder'],
+        orElse: () => AudioEncoder.aacLc,
+      ),
+      bitRate: map['bitRate'] as int? ?? 128000,
+      sampleRate: map['sampleRate'] as int? ?? 44100,
+      numChannels: map['numChannels'] as int? ?? 2,
+      device: map['device'] != null
+          ? InputDevice.fromMap(map['device'] as Map)
+          : null,
+      autoGain: map['autoGain'] as bool? ?? false,
+      echoCancel: map['echoCancel'] as bool? ?? false,
+      noiseSuppress: map['noiseSuppress'] as bool? ?? false,
+      audioInterruption:
+          AudioInterruptionMode.values[map['audioInterruption'] as int? ??
+              AudioInterruptionMode.pause.index],
+      streamBufferSize: map['streamBufferSize'] as int?,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'encoder': encoder.name,
@@ -105,5 +158,21 @@ class RecordConfig {
       'audioInterruption': audioInterruption.index,
       'streamBufferSize': streamBufferSize,
     };
+  }
+
+  @override
+  String toString() {
+    return 'RecordConfig(\n'
+        '  encoder: $encoder,\n'
+        '  bitRate: $bitRate,\n'
+        '  sampleRate: $sampleRate,\n'
+        '  numChannels: $numChannels,\n'
+        '  device: $device,\n'
+        '  autoGain: $autoGain,\n'
+        '  echoCancel: $echoCancel,\n'
+        '  noiseSuppress: $noiseSuppress,\n'
+        '  audioInterruption: $audioInterruption,\n'
+        '  streamBufferSize: $streamBufferSize,\n'
+        ')';
   }
 }

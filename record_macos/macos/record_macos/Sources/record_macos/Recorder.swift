@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import FlutterMacOS
 
 class Recorder {
   private let minAmplitudeDB: Float = -160.0
@@ -12,11 +13,13 @@ class Recorder {
   private var m_recordEventHandler: RecordStreamHandler
 
   private var m_delegate: AudioRecordingDelegate?
+  private var m_configChangedChannel: FlutterMethodChannel?
 
-  init(queue: DispatchQueue, stateEventHandler: StateStreamHandler, recordEventHandler: RecordStreamHandler) {
+  init(queue: DispatchQueue, stateEventHandler: StateStreamHandler, recordEventHandler: RecordStreamHandler, configChangedChannel: FlutterMethodChannel? = nil) {
     m_queue = queue
     m_stateEventHandler = stateEventHandler
     m_recordEventHandler = recordEventHandler
+    m_configChangedChannel = configChangedChannel
   }
 
   // MARK: - All methods below are called on m_queue (via withRecorder in the plugin)
@@ -40,6 +43,8 @@ class Recorder {
     )
     try delegate.start(config: config, path: path)
     m_delegate = delegate
+
+    if config.isModified { notifyConfigChanged(config) }
   }
 
   func startStream(config: RecordConfig) throws {
@@ -57,6 +62,8 @@ class Recorder {
     )
     try delegate.start(config: config, recordEventHandler: m_recordEventHandler)
     m_delegate = delegate
+
+    if config.isModified { notifyConfigChanged(config) }
   }
 
   @discardableResult
@@ -112,6 +119,13 @@ class Recorder {
   }
 
   // MARK: - Private
+
+  private func notifyConfigChanged(_ config: RecordConfig) {
+    let args = config.toMap()
+    DispatchQueue.main.async { [weak self] in
+      self?.m_configChangedChannel?.invokeMethod("onConfigChanged", arguments: args)
+    }
+  }
 
   private func updateState(_ state: RecordState) {
     guard m_state != state else { return }

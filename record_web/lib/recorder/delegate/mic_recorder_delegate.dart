@@ -14,6 +14,7 @@ import 'package:web/web.dart' as web;
 
 class MicRecorderDelegate extends RecorderDelegate {
   final OnStateChanged onStateChanged;
+  final void Function(RecordConfig)? onConfigChanged;
 
   // Media stream get from getUserMedia
   web.MediaStream? _mediaStream;
@@ -27,7 +28,7 @@ class MicRecorderDelegate extends RecorderDelegate {
   double _maxAmplitude = kMinAmplitude;
   double _amplitude = kMinAmplitude;
 
-  MicRecorderDelegate({required this.onStateChanged});
+  MicRecorderDelegate({required this.onStateChanged, this.onConfigChanged});
 
   @override
   Future<void> dispose() => _reset();
@@ -112,7 +113,9 @@ class MicRecorderDelegate extends RecorderDelegate {
   Future<void> _start(RecordConfig config, {bool isStream = false}) async {
     final mediaStream = await initMediaStream(config);
 
-    final context = getContext(mediaStream, config);
+    final effectiveConfig = adjustConfig(mediaStream, config, onConfigChanged);
+    final context = effectiveConfig.context;
+    config = effectiveConfig.config;
 
     final source = context.createMediaStreamSource(mediaStream);
 

@@ -20,12 +20,14 @@ class RecorderWrapper(
   companion object {
     const val EVENTS_STATE_CHANNEL = "com.llfbandit.record/events/"
     const val EVENTS_RECORD_CHANNEL = "com.llfbandit.record/eventsRecord/"
+    const val CONFIG_CHANGED_CHANNEL = "com.llfbandit.record/configChanged/"
   }
 
   private var eventChannel: EventChannel?
   private val recorderStateStreamHandler = RecorderStateStreamHandler()
   private var eventRecordChannel: EventChannel?
   private val recorderRecordStreamHandler = RecorderRecordStreamHandler()
+  private val configChangedChannel: MethodChannel
   private var recorder: IRecorder? = null
   private val bluetoothManager = BluetoothManager(context)
 
@@ -34,6 +36,7 @@ class RecorderWrapper(
     eventChannel?.setStreamHandler(recorderStateStreamHandler)
     eventRecordChannel = EventChannel(messenger, EVENTS_RECORD_CHANNEL + recorderId)
     eventRecordChannel?.setStreamHandler(recorderRecordStreamHandler)
+    configChangedChannel = MethodChannel(messenger, CONFIG_CHANGED_CHANNEL + recorderId)
   }
 
   fun startRecordingToFile(config: RecordConfig, result: MethodChannel.Result) {
@@ -159,10 +162,16 @@ class RecorderWrapper(
 
   private fun start(config: RecordConfig, result: MethodChannel.Result) {
     try {
+      val orig = config.copy()
       recorder!!.start(config)
       result.success(null)
+      if (config.isModified(orig)) notifyConfigChanged(config)
     } catch (e: Exception) {
       result.error("record", e.message, e.cause)
     }
+  }
+
+  private fun notifyConfigChanged(config: RecordConfig) {
+    configChangedChannel.invokeMethod("onConfigChanged", config.toMap())
   }
 }

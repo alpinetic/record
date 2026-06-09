@@ -11,24 +11,15 @@ extension AudioRecordingDelegate {
     }
   }
 
-  func getInputSettings(config: RecordConfig) -> [String: Any]? {
-    let sampleRate = getInputSampleRate(device: config.device) ?? Double(config.sampleRate)
-    let channels   = getInputChannelCount(device: config.device).map { UInt32(max(1, $0)) }
-                     ?? UInt32(min(config.numChannels, 2))
-
-    return AVAudioFormat(
-      commonFormat: .pcmFormatInt16,
-      sampleRate: sampleRate,
-      channels: channels,
-      interleaved: false
-    )?.settings
-  }
-
   // https://developer.apple.com/documentation/coreaudiotypes/coreaudiotype_constants/1572096-audio_data_format_identifiers
   func getOutputSettings(config: RecordConfig) throws -> [String: Any] {
     var settings = initialOutputSettings(config: config)
+    let deviceChannels = getInputChannelCount(device: config.device)
 
-    guard let inputSettings = getInputSettings(config: config),
+    adjustChannelCount(in: &settings, deviceChannels: deviceChannels)
+    if let v = settings[AVNumberOfChannelsKey] as? Int { config.numChannels = v }
+
+    guard let inputSettings = getInputSettings(config: config, deviceChannels: deviceChannels),
           let inFormat = AVAudioFormat(settings: inputSettings) else {
       throw RecorderError.error(message: "Failed to start recording", details: "Input format initialization failure.")
     }
@@ -39,11 +30,9 @@ extension AudioRecordingDelegate {
       throw RecorderError.error(message: "Failed to start recording", details: "Format conversion isn't possible. Format or configuration is not supported.")
     }
 
-    adjustChannelCount(in: &settings, config: config)
     adjustSampleRate(in: &settings, converter: converter)
     adjustBitRate(in: &settings, converter: converter)
 
-    if let v = settings[AVNumberOfChannelsKey] as? Int    { config.numChannels = v }
     if let v = settings[AVSampleRateKey]       as? Double { config.sampleRate  = Int(v) }
     if let v = settings[AVEncoderBitRateKey]   as? Int    { config.bitRate     = v }
 
@@ -54,6 +43,19 @@ extension AudioRecordingDelegate {
 // MARK: - Per-encoder initial settings
 
 private extension AudioRecordingDelegate {
+  func getInputSettings(config: RecordConfig, deviceChannels: Int?) -> [String: Any]? {
+    let sampleRate = getInputSampleRate(device: config.device) ?? Double(config.sampleRate)
+    let channels   = deviceChannels.map { UInt32(max(1, $0)) }
+                     ?? UInt32(min(config.numChannels, 2))
+
+    return AVAudioFormat(
+      commonFormat: .pcmFormatInt16,
+      sampleRate: sampleRate,
+      channels: channels,
+      interleaved: false
+    )?.settings
+  }
+
   func initialOutputSettings(config: RecordConfig) -> [String: Any] {
     switch config.encoder {
     case AudioEncoder.aacLc.rawValue:  return aacSettings(formatId: kAudioFormatMPEG4AAC,        config: config)
@@ -130,12 +132,10 @@ private extension AudioRecordingDelegate {
     ]
   }
 
-  func adjustChannelCount(in settings: inout [String: Any], config: RecordConfig) {
-    guard let deviceChannels = getInputChannelCount(device: config.device),
-          let requested = settings[AVNumberOfChannelsKey] as? Int,
-          requested > deviceChannels else { return }
-
-    settings[AVNumberOfChannelsKey] = deviceChannels
+  func adjustChannelCount(in settings: inout [String: Any], deviceChannels: Int?) {
+    guard let requested = settings[AVNumberOfChannelsKey] as? Int else { return }
+    let adjusted = max(1, deviceChannels.map { min(requested, $0) } ?? requested)
+    if adjusted != requested { settings[AVNumberOfChannelsKey] = adjusted }
   }
 
   func adjustSampleRate(in settings: inout [String: Any], converter: AVAudioConverter) {

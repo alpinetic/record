@@ -11,6 +11,7 @@ namespace AudioDevice {
 
 HRESULT ListInputDevices(flutter::EncodableList& devices);
 HRESULT IsEncoderSupported(const std::string& encoderName, bool* supported);
+HRESULT AdjustConfigToDeviceCaps(RecordConfig& config);
 HRESULT AdjustConfigToCodecCaps(RecordConfig& config);
 
 } // namespace AudioDevice
