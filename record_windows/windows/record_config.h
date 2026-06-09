@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <flutter/encodable_value.h>
 
 namespace record_windows
 {
@@ -28,6 +29,7 @@ namespace record_windows
 		bool autoGain = false;
 		bool echoCancel = false;
 		bool noiseSuppress = false;
+		flutter::EncodableMap rawArgs;
 
 		RecordConfig(
 			const std::string& encoderName,
@@ -37,7 +39,8 @@ namespace record_windows
 			int numChannels,
 			bool autoGain,
 			bool echoCancel,
-			bool noiseSuppress)
+			bool noiseSuppress,
+			flutter::EncodableMap rawArgs)
 			: encoderName(encoderName),
 			deviceId(deviceId),
 			bitRate(bitRate),
@@ -45,7 +48,8 @@ namespace record_windows
 			numChannels(numChannels),
 			autoGain(autoGain),
 			echoCancel(echoCancel),
-			noiseSuppress(noiseSuppress)
+			noiseSuppress(noiseSuppress),
+			rawArgs(std::move(rawArgs))
 		{
 		}
 	};

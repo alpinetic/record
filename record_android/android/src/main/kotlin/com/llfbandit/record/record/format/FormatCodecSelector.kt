@@ -101,9 +101,12 @@ internal object FormatCodecSelector {
     val device = config.device ?: DeviceUtils.getDefaultInputDevice()
 
     device?.let {
-      val deviceChannelCounts = it.channelCounts
+      // PCMReader only supports mono or stereo; ignore any device channel counts above 2.
+      val deviceChannelCounts = it.channelCounts.filter { c -> c <= 2 }.toIntArray()
       if (deviceChannelCounts.isNotEmpty()) {
-        format.adjustNumChannels(mediaFormat, nearestValue(deviceChannelCounts, config.numChannels))
+        val adjustedChannels = nearestValue(deviceChannelCounts, config.numChannels)
+        format.adjustNumChannels(mediaFormat, adjustedChannels)
+        config.numChannels = adjustedChannels
       }
     }
   }

@@ -329,7 +329,8 @@ namespace record_windows {
 			numChannels,
 			autoGain,
 			echoCancel,
-			noiseSuppress
+			noiseSuppress,
+			*args
 		);
 
 		return config;
@@ -367,18 +368,10 @@ namespace record_windows {
 		{
 			auto* pChannel = configChangedChannel.get();
 			pRecorder->SetOnConfigChanged([pChannel](const RecordConfig& cfg) {
-				EncodableMap args = {
-					{EncodableValue("encoder"),         EncodableValue(cfg.encoderName)},
-					{EncodableValue("bitRate"),         EncodableValue(cfg.bitRate)},
-					{EncodableValue("sampleRate"),      EncodableValue(cfg.sampleRate)},
-					{EncodableValue("numChannels"),     EncodableValue(cfg.numChannels)},
-					{EncodableValue("device"),          EncodableValue()},
-					{EncodableValue("autoGain"),        EncodableValue(cfg.autoGain)},
-					{EncodableValue("echoCancel"),      EncodableValue(cfg.echoCancel)},
-					{EncodableValue("noiseSuppress"),   EncodableValue(cfg.noiseSuppress)},
-					{EncodableValue("audioInterruption"), EncodableValue(1)},
-					{EncodableValue("streamBufferSize"), EncodableValue()},
-				};
+				EncodableMap args = cfg.rawArgs;
+				args[EncodableValue("bitRate")]     = EncodableValue(cfg.bitRate);
+				args[EncodableValue("sampleRate")]  = EncodableValue(cfg.sampleRate);
+				args[EncodableValue("numChannels")] = EncodableValue(cfg.numChannels);
 				pChannel->InvokeMethod("onConfigChanged",
 					std::make_unique<EncodableValue>(EncodableMap(std::move(args))));
 			});
