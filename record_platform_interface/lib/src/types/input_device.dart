@@ -10,7 +10,7 @@ class InputDevice {
   /// The transport type of this device.
   ///
   /// Defaults to [InputDeviceType.unknown] on platforms that do not report
-  /// device types (Windows, Linux, Web).
+  /// device types (Linux, Web).
   final InputDeviceType type;
 
   /// The sample rates supported or prefered by this device.
