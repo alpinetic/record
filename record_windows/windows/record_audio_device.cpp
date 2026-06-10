@@ -6,67 +6,195 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <mftransform.h>
+#include <mmdeviceapi.h>
+#include <functiondiscoverykeys_devpkey.h>
+#include <propidl.h>
+#include <devicetopology.h>
 #include <vector>
+#include <mutex>
+#include <thread>
+#include <unordered_map>
 
 namespace record_windows {
 namespace AudioDevice {
 
+// Avoids linking PKEY_AudioEngine_DeviceFormat from propsys.lib (LNK2001)
+static const PROPERTYKEY kAudioEngineDeviceFormat = {
+    {0xf19f064d, 0x082c, 0x4e27, {0xbc,0x73,0x68,0x82,0xa1,0xbb,0x8e,0x4c}}, 0
+};
+
+struct CodecCapsEntry { UINT32 channels, sampleRate, bitRate; };
+static std::mutex                                                    gCapsMutex;
+static std::unordered_map<std::string, std::vector<CodecCapsEntry>> gCapsCache;
+
+static std::vector<CodecCapsEntry> FetchCodecCaps(GUID subtypeGuid)
+{
+    std::vector<CodecCapsEntry> caps;
+
+    IMFActivate** ppMFTActivate  = NULL;
+    UINT32        numMFTActivate = 0;
+
+    MFT_REGISTER_TYPE_INFO typeInfo = { MFMediaType_Audio, subtypeGuid };
+    DWORD dwFlags = (MFT_ENUM_FLAG_ALL & (~MFT_ENUM_FLAG_FIELDOFUSE)) | MFT_ENUM_FLAG_SORTANDFILTER;
+
+    if (FAILED(MFTEnumEx(MFT_CATEGORY_AUDIO_ENCODER, dwFlags, NULL, &typeInfo, &ppMFTActivate, &numMFTActivate)))
+        return caps;
+
+    if (numMFTActivate > 0)
+    {
+        IMFTransform* pMFT = NULL;
+        if (SUCCEEDED(ppMFTActivate[0]->ActivateObject(IID_PPV_ARGS(&pMFT))))
+        {
+            for (DWORD i = 0; ; i++)
+            {
+                IMFMediaType* pType = NULL;
+                if (FAILED(pMFT->GetOutputAvailableType(0, i, &pType))) break;
+
+                CodecCapsEntry e = {};
+                pType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &e.sampleRate);
+                pType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS,       &e.channels);
+                pType->GetUINT32(MF_MT_AVG_BITRATE,              &e.bitRate);
+                SafeRelease(&pType);
+
+                if (e.sampleRate > 0 && e.channels > 0) caps.push_back(e);
+            }
+
+            ppMFTActivate[0]->ShutdownObject();
+            SafeRelease(&pMFT);
+        }
+    }
+
+    for (UINT32 i = 0; i < numMFTActivate; i++) SafeRelease(ppMFTActivate[i]);
+    CoTaskMemFree(ppMFTActivate);
+
+    return caps;
+}
+
+static std::string DeviceTypeFromInstanceId(LPCWSTR id)
+{
+    const wchar_t* p = id;
+    if (wcslen(p) > 4 && p[0]==L'\\' && p[1]==L'\\' && p[2]==L'?' && p[3]==L'\\')
+        p += 4;
+
+    if (wcsstr(p, L"HDAUDIO"))      return "builtIn";
+    if (wcsstr(p, L"USB"))          return "usb";
+    if (wcsstr(p, L"BTHLEDevice"))  return "bluetoothLe";
+    if (wcsstr(p, L"BTHLE"))        return "bluetoothLe";
+    if (wcsstr(p, L"BTHENUM"))      return "bluetoothSco";
+    return "unknown";
+}
+
+static std::string GetDeviceTypeViaTopology(IMMDevice* pDevice)
+{
+    IDeviceTopology* pTopology = NULL;
+    IConnector*      pConn     = NULL;
+    IConnector*      pConnTo   = NULL;
+    IPart*           pPart     = NULL;
+    std::string      result    = "unknown";
+
+    HRESULT hr = pDevice->Activate(__uuidof(IDeviceTopology), CLSCTX_ALL, NULL, (void**)&pTopology);
+    if (SUCCEEDED(hr))
+    {
+			hr = pTopology->GetConnector(0, &pConn);
+		}
+    if (SUCCEEDED(hr))
+		{
+        hr = pConn->GetConnectedTo(&pConnTo);
+		}
+    if (SUCCEEDED(hr))
+		{
+        hr = pConnTo->QueryInterface(IID_PPV_ARGS(&pPart));
+		}
+    if (SUCCEEDED(hr))
+    {
+        IDeviceTopology* pHwTopo = NULL;
+        if (SUCCEEDED(pPart->GetTopologyObject(&pHwTopo)))
+        {
+            LPWSTR pwszDevId = NULL;
+            if (SUCCEEDED(pHwTopo->GetDeviceId(&pwszDevId)) && pwszDevId)
+            {
+                result = DeviceTypeFromInstanceId(pwszDevId);
+                CoTaskMemFree(pwszDevId);
+            }
+            SafeRelease(&pHwTopo);
+        }
+    }
+
+    SafeRelease(&pPart);
+    SafeRelease(&pConnTo);
+    SafeRelease(&pConn);
+    SafeRelease(&pTopology);
+    return result;
+}
+
 HRESULT ListInputDevices(flutter::EncodableList& devices)
 {
-	HRESULT hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-	if (FAILED(hr)) return hr;
+	IMMDeviceEnumerator* pEnumerator = NULL;
+	IMMDeviceCollection* pCollection = NULL;
 
-	IMFAttributes* pDeviceAttributes = NULL;
-	IMFActivate**  ppDevices = NULL;
-	UINT32         deviceCount = 0;
+	HRESULT hr = CoCreateInstance(
+		__uuidof(MMDeviceEnumerator), NULL,
+		CLSCTX_ALL, IID_PPV_ARGS(&pEnumerator)
+	);
+	if (SUCCEEDED(hr))
+		hr = pEnumerator->EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE, &pCollection);
 
-	hr = MFCreateAttributes(&pDeviceAttributes, 1);
 	if (SUCCEEDED(hr))
 	{
-		hr = pDeviceAttributes->SetGUID(
-			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
-			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID);
-	}
-	if (SUCCEEDED(hr))
-	{
-		hr = MFEnumDeviceSources(pDeviceAttributes, &ppDevices, &deviceCount);
-	}
+		UINT count = 0;
+		pCollection->GetCount(&count);
 
-	for (UINT32 i = 0; i < deviceCount; i++)
-	{
-		LPWSTR friendlyName = NULL;
-		UINT32 friendlyNameLength = 0;
-		LPWSTR id = NULL;
-		UINT32 idLength = 0;
-
-		HRESULT deviceHr = ppDevices[i]->GetAllocatedString(
-			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_ENDPOINT_ID, &id, &idLength);
-		if (SUCCEEDED(deviceHr))
+		for (UINT i = 0; i < count; i++)
 		{
-			deviceHr = ppDevices[i]->GetAllocatedString(
-				MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &friendlyName, &friendlyNameLength);
-		}
-		if (SUCCEEDED(deviceHr))
-		{
-			devices.push_back(flutter::EncodableMap({
-				{flutter::EncodableValue("id"),    flutter::EncodableValue(Utf8FromUtf16(id))},
-				{flutter::EncodableValue("label"), flutter::EncodableValue(Utf8FromUtf16(friendlyName))}
-			}));
-		}
+			IMMDevice*      pDevice = NULL;
+			IPropertyStore* pProps  = NULL;
 
-		CoTaskMemFree(id);
-		CoTaskMemFree(friendlyName);
+			if (FAILED(pCollection->Item(i, &pDevice))) continue;
+
+			LPWSTR pwszId = NULL;
+			pDevice->GetId(&pwszId);
+
+			if (SUCCEEDED(pDevice->OpenPropertyStore(STGM_READ, &pProps)))
+			{
+				PROPVARIANT varName, varFormat;
+				PropVariantInit(&varName);
+				PropVariantInit(&varFormat);
+
+				pProps->GetValue(PKEY_Device_FriendlyName, &varName);
+				pProps->GetValue(kAudioEngineDeviceFormat, &varFormat);
+
+				std::string label = (varName.vt == VT_LPWSTR) ? Utf8FromUtf16(varName.pwszVal) : "";
+				std::string type  = GetDeviceTypeViaTopology(pDevice);
+
+				flutter::EncodableList rateList;
+				if (varFormat.vt == VT_BLOB && varFormat.blob.cbSize >= sizeof(WAVEFORMATEX))
+				{
+					auto* wf = reinterpret_cast<const WAVEFORMATEX*>(varFormat.blob.pBlobData);
+					if (wf->nSamplesPerSec > 0)
+						rateList.push_back(flutter::EncodableValue((int)wf->nSamplesPerSec));
+				}
+
+				devices.push_back(flutter::EncodableMap({
+					{flutter::EncodableValue("id"),          flutter::EncodableValue(Utf8FromUtf16(pwszId))},
+					{flutter::EncodableValue("label"),       flutter::EncodableValue(label)},
+					{flutter::EncodableValue("type"),        flutter::EncodableValue(type)},
+					{flutter::EncodableValue("sampleRates"), flutter::EncodableValue(std::move(rateList))},
+				}));
+
+				PropVariantClear(&varName);
+				PropVariantClear(&varFormat);
+				SafeRelease(&pProps);
+			}
+
+			CoTaskMemFree(pwszId);
+			SafeRelease(&pDevice);
+		}
 	}
 
-	for (UINT32 i = 0; i < deviceCount; i++)
-	{
-		SafeRelease(ppDevices[i]);
-	}
-	CoTaskMemFree(ppDevices);
-	SafeRelease(&pDeviceAttributes);
+	SafeRelease(&pCollection);
+	SafeRelease(&pEnumerator);
 
-	MFShutdown();
-	return hr;
+	return SUCCEEDED(hr) ? S_OK : hr;
 }
 
 HRESULT IsEncoderSupported(const std::string& encoderName, bool* supported)
@@ -125,84 +253,54 @@ HRESULT IsEncoderSupported(const std::string& encoderName, bool* supported)
 
 HRESULT AdjustConfigToDeviceCaps(RecordConfig& config)
 {
-	IMFAttributes*   pAttributes = NULL;
-	IMFMediaSource*  pSource     = NULL;
-	IMFSourceReader* pReader     = NULL;
+	IMMDeviceEnumerator* pEnumerator = NULL;
+	IMMDevice*           pDevice     = NULL;
+	IPropertyStore*      pProps      = NULL;
 
-	HRESULT hr = MFCreateAttributes(&pAttributes, 2);
+	HRESULT hr = CoCreateInstance(
+		__uuidof(MMDeviceEnumerator), NULL,
+		CLSCTX_ALL, IID_PPV_ARGS(&pEnumerator)
+	);
 
 	if (SUCCEEDED(hr))
 	{
-		hr = pAttributes->SetGUID(
-			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
-			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID
-		);
-	}
-	if (SUCCEEDED(hr) && !config.deviceId.empty())
-	{
-		auto deviceId = std::wstring(config.deviceId.begin(), config.deviceId.end());
-		hr = pAttributes->SetString(
-			MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_ENDPOINT_ID,
-			deviceId.c_str()
-		);
-	}
-	if (SUCCEEDED(hr))
-	{
-		hr = MFCreateDeviceSource(pAttributes, &pSource);
-	}
-	if (SUCCEEDED(hr))
-	{
-		hr = MFCreateSourceReaderFromMediaSource(pSource, NULL, &pReader);
-	}
-	if (SUCCEEDED(hr))
-	{
-		std::vector<UINT32> channels;
-
-		for (DWORD i = 0; ; i++)
+		if (config.deviceId.empty())
+			hr = pEnumerator->GetDefaultAudioEndpoint(eCapture, eCommunications, &pDevice);
+		else
 		{
-			IMFMediaType* pType = NULL;
-			if (FAILED(pReader->GetNativeMediaType(
-					(DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, i, &pType)))
-				break;
-
-			GUID subtype = GUID_NULL;
-			pType->GetGUID(MF_MT_SUBTYPE, &subtype);
-
-			if (subtype == MFAudioFormat_PCM || subtype == MFAudioFormat_Float)
-			{
-				UINT32 ch = 0;
-				pType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &ch);
-				if (ch > 0) channels.push_back(ch);
-			}
-			SafeRelease(&pType);
-		}
-
-		if (!channels.empty())
-		{
-			const UINT32 reqCh = (UINT32)config.numChannels;
-
-			UINT32 bestCh = channels[0];
-			for (UINT32 ch : channels)
-			{
-				UINT32 a = ch    >= reqCh ? ch    - reqCh : reqCh - ch;
-				UINT32 b = bestCh >= reqCh ? bestCh - reqCh : reqCh - bestCh;
-				if (a < b) bestCh = ch;
-			}
-
-			config.numChannels = (int)bestCh;
+			auto deviceId = std::wstring(config.deviceId.begin(), config.deviceId.end());
+			hr = pEnumerator->GetDevice(deviceId.c_str(), &pDevice);
 		}
 	}
 
-	SafeRelease(&pReader);
-	SafeRelease(&pSource);
-	SafeRelease(&pAttributes);
+	if (SUCCEEDED(hr))
+		hr = pDevice->OpenPropertyStore(STGM_READ, &pProps);
+
+	if (SUCCEEDED(hr))
+	{
+		PROPVARIANT varFormat;
+		PropVariantInit(&varFormat);
+
+		if (SUCCEEDED(pProps->GetValue(kAudioEngineDeviceFormat, &varFormat)) &&
+		    varFormat.vt == VT_BLOB && varFormat.blob.cbSize >= sizeof(WAVEFORMATEX))
+		{
+			auto* wf = reinterpret_cast<const WAVEFORMATEX*>(varFormat.blob.pBlobData);
+			if (config.numChannels > (int)wf->nChannels)
+				config.numChannels = (int)wf->nChannels;
+		}
+
+		PropVariantClear(&varFormat);
+	}
+
+	SafeRelease(&pProps);
+	SafeRelease(&pDevice);
+	SafeRelease(&pEnumerator);
 
 	return S_OK; // non-fatal
 }
 
 HRESULT AdjustConfigToCodecCaps(RecordConfig& config)
 {
-	// AMR has fixed mandatory parameters
 	if (config.encoderName == AudioEncoder::amrNb) {
 		config.sampleRate  = 8000;
 		config.numChannels = 1;
@@ -213,7 +311,6 @@ HRESULT AdjustConfigToCodecCaps(RecordConfig& config)
 		config.numChannels = 1;
 		return S_OK;
 	}
-	// PCM/WAV have no codec constraints
 	if (config.encoderName == AudioEncoder::pcm16bits ||
 	    config.encoderName == AudioEncoder::wav) {
 		return S_OK;
@@ -230,79 +327,77 @@ HRESULT AdjustConfigToCodecCaps(RecordConfig& config)
 		return S_OK;
 	}
 
-	IMFActivate**  ppMFTActivate  = NULL;
-	UINT32         numMFTActivate = 0;
-
-	MFT_REGISTER_TYPE_INFO typeInfo = { MFMediaType_Audio, subtypeGuid };
-
-	DWORD dwFlags = (MFT_ENUM_FLAG_ALL & (~MFT_ENUM_FLAG_FIELDOFUSE)) | MFT_ENUM_FLAG_SORTANDFILTER;
-
-	HRESULT hr = MFTEnumEx(MFT_CATEGORY_AUDIO_ENCODER, dwFlags, NULL, &typeInfo, &ppMFTActivate, &numMFTActivate);
-
-	if (SUCCEEDED(hr) && numMFTActivate > 0)
+	std::vector<CodecCapsEntry> caps;
 	{
-		IMFTransform* pMFT = NULL;
-		if (SUCCEEDED(ppMFTActivate[0]->ActivateObject(IID_PPV_ARGS(&pMFT))))
-		{
-			struct CapsEntry { UINT32 sampleRate, channels, bitRate; };
-			std::vector<CapsEntry> caps;
-
-			for (DWORD i = 0; ; i++)
-			{
-				IMFMediaType* pType = NULL;
-				if (FAILED(pMFT->GetOutputAvailableType(0, i, &pType))) break;
-
-				CapsEntry e = {};
-				pType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &e.sampleRate);
-				pType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS,       &e.channels);
-				pType->GetUINT32(MF_MT_AVG_BITRATE,              &e.bitRate);
-				SafeRelease(&pType);
-
-				if (e.sampleRate > 0 && e.channels > 0) caps.push_back(e);
-			}
-
-			if (!caps.empty())
-			{
-				const UINT32 reqSr = (UINT32)config.sampleRate;
-				const UINT32 reqCh = (UINT32)config.numChannels;
-				const UINT32 reqBr = (UINT32)config.bitRate;
-
-				auto absDiff = [](UINT32 a, UINT32 b) -> UINT32 {
-					return a >= b ? a - b : b - a;
-				};
-
-				// Cascaded selection: channels → sample rate → bitrate
-				UINT32 bestCh = caps[0].channels;
-				for (const auto& e : caps)
-					if (absDiff(e.channels, reqCh) < absDiff(bestCh, reqCh))
-						bestCh = e.channels;
-
-				UINT32 bestSr = 0;
-				for (const auto& e : caps)
-					if (e.channels == bestCh)
-						if (bestSr == 0 || absDiff(e.sampleRate, reqSr) < absDiff(bestSr, reqSr))
-							bestSr = e.sampleRate;
-
-				UINT32 bestBr = 0;
-				for (const auto& e : caps)
-					if (e.channels == bestCh && e.sampleRate == bestSr)
-						if (bestBr == 0 || absDiff(e.bitRate, reqBr) < absDiff(bestBr, reqBr))
-							bestBr = e.bitRate;
-
-				config.numChannels = (int)bestCh;
-				config.sampleRate  = (int)bestSr;
-				if (bestBr > 0) config.bitRate = (int)bestBr;
-			}
-
-			ppMFTActivate[0]->ShutdownObject();
-			SafeRelease(&pMFT);
-		}
+		std::lock_guard<std::mutex> lock(gCapsMutex);
+		auto it = gCapsCache.find(config.encoderName);
+		if (it != gCapsCache.end())
+			caps = it->second;
 	}
 
-	for (UINT32 i = 0; i < numMFTActivate; i++) SafeRelease(ppMFTActivate[i]);
-	CoTaskMemFree(ppMFTActivate);
+	if (caps.empty())
+	{
+		caps = FetchCodecCaps(subtypeGuid);
+		std::lock_guard<std::mutex> lock(gCapsMutex);
+		gCapsCache[config.encoderName] = caps;
+	}
+
+	if (!caps.empty())
+	{
+		const UINT32 reqSr = (UINT32)config.sampleRate;
+		const UINT32 reqCh = (UINT32)config.numChannels;
+		const UINT32 reqBr = (UINT32)config.bitRate;
+
+		auto absDiff = [](UINT32 a, UINT32 b) -> UINT32 {
+			return a >= b ? a - b : b - a;
+		};
+
+		UINT32 bestCh = caps[0].channels;
+		for (const auto& e : caps)
+			if (absDiff(e.channels, reqCh) < absDiff(bestCh, reqCh))
+				bestCh = e.channels;
+
+		UINT32 bestSr = 0;
+		for (const auto& e : caps)
+			if (e.channels == bestCh)
+				if (bestSr == 0 || absDiff(e.sampleRate, reqSr) < absDiff(bestSr, reqSr))
+					bestSr = e.sampleRate;
+
+		UINT32 bestBr = 0;
+		for (const auto& e : caps)
+			if (e.channels == bestCh && e.sampleRate == bestSr)
+				if (bestBr == 0 || absDiff(e.bitRate, reqBr) < absDiff(bestBr, reqBr))
+					bestBr = e.bitRate;
+
+		config.numChannels = (int)bestCh;
+		config.sampleRate  = (int)bestSr;
+		if (bestBr > 0) config.bitRate = (int)bestBr;
+	}
 
 	return S_OK;
+}
+
+void WarmCodecCapsAsync()
+{
+	std::thread([]() {
+		if (FAILED(MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET))) return;
+
+		static const struct { const char* name; GUID guid; } kEncoders[] = {
+			{AudioEncoder::aacLc,  MFAudioFormat_AAC},
+			{AudioEncoder::aacEld, MFAudioFormat_AAC},
+			{AudioEncoder::aacHe,  MFAudioFormat_AAC},
+			{AudioEncoder::flac,   MFAudioFormat_FLAC},
+		};
+
+		for (const auto& enc : kEncoders)
+		{
+			auto caps = FetchCodecCaps(enc.guid);
+			std::lock_guard<std::mutex> lock(gCapsMutex);
+			gCapsCache.emplace(enc.name, std::move(caps));
+		}
+
+		MFShutdown();
+	}).detach();
 }
 
 } // namespace AudioDevice

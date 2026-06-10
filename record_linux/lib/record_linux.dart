@@ -340,12 +340,20 @@ class RecordLinux extends RecordPlatform {
     final devices = <InputDevice>[];
     String? currentDeviceId;
     String? currentDeviceName;
+    List<int> currentSampleRates = [];
 
     void commitDevice() {
       if (currentDeviceId != null &&
           currentDeviceName != null &&
+          !currentDeviceId.endsWith('.monitor') &&
           !currentDeviceName.startsWith('Monitor of')) {
-        devices.add(InputDevice(id: currentDeviceId, label: currentDeviceName));
+        devices.add(
+          InputDevice(
+            id: currentDeviceId,
+            label: currentDeviceName,
+            sampleRates: currentSampleRates,
+          ),
+        );
       }
     }
 
@@ -354,12 +362,18 @@ class RecordLinux extends RecordPlatform {
         commitDevice();
         currentDeviceId = null;
         currentDeviceName = null;
+        currentSampleRates = [];
       } else if (line.trim().startsWith('node.name')) {
         currentDeviceId = line.split('=')[1].trim();
       } else if (line.trim().startsWith('Name:')) {
         currentDeviceName = line.substring(line.indexOf(':') + 1).trim();
       } else if (line.trim().startsWith('Description:')) {
         currentDeviceName = line.substring(line.indexOf(':') + 1).trim();
+      } else if (line.trim().startsWith('Sample Specification:')) {
+        final match = RegExp(r'(\d+)Hz').firstMatch(line);
+        if (match != null) {
+          currentSampleRates = [int.parse(match.group(1)!)];
+        }
       }
     }
 

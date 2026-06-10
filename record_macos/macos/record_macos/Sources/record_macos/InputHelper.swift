@@ -5,10 +5,36 @@ func listInputs() throws -> [Device] {
   var devices: [Device] = []
 
   listInputDevices().forEach { input in
-    devices.append(Device(id: input.uniqueID, label: input.localizedName))
+    let deviceID = getAudioDeviceIDFromUID(uid: input.uniqueID)
+    let type = deviceID.map { getInputTransportType(deviceID: $0) } ?? "unknown"
+    let sampleRates = deviceID.map { getInputSampleRates(deviceID: $0) } ?? []
+    devices.append(Device(id: input.uniqueID, label: input.localizedName, type: type, sampleRates: sampleRates))
   }
 
   return devices
+}
+
+func getInputTransportType(deviceID: AudioDeviceID) -> String {
+  var addr = AudioObjectPropertyAddress(
+    mSelector: kAudioDevicePropertyTransportType,
+    mScope: kAudioObjectPropertyScopeGlobal,
+    mElement: kAudioObjectPropertyElementMain
+  )
+  var transportType: UInt32 = 0
+  var size = UInt32(MemoryLayout<UInt32>.size)
+  guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &transportType) == noErr else { return "unknown" }
+
+  switch transportType {
+  case kAudioDeviceTransportTypeBuiltIn:     return "builtIn"
+  case kAudioDeviceTransportTypeUSB:         return "usb"
+  case kAudioDeviceTransportTypeBluetooth:   return "bluetoothSco"
+  case kAudioDeviceTransportTypeBluetoothLE: return "bluetoothLe"
+  case kAudioDeviceTransportTypeHDMI:        return "hdmi"
+  case kAudioDeviceTransportTypeDisplayPort: return "displayPort"
+  case kAudioDeviceTransportTypeAirPlay:     return "airPlay"
+  case kAudioDeviceTransportTypeThunderbolt: return "thunderbolt"
+  default:                                   return "unknown"
+  }
 }
 
 func listInputDevices() -> [AVCaptureDevice] {
@@ -66,6 +92,27 @@ func getInputChannelCount(device: Device?) -> Int? {
 
   let total = UnsafeMutableAudioBufferListPointer(bufferList).reduce(0) { $0 + Int($1.mNumberChannels) }
   return total > 0 ? total : nil
+}
+
+func getInputSampleRates(deviceID: AudioDeviceID) -> [Int] {
+  var addr = AudioObjectPropertyAddress(
+    mSelector: kAudioDevicePropertyAvailableNominalSampleRates,
+    mScope: kAudioObjectPropertyScopeGlobal,
+    mElement: kAudioObjectPropertyElementMain
+  )
+  var size: UInt32 = 0
+  guard AudioObjectGetPropertyDataSize(deviceID, &addr, 0, nil, &size) == noErr, size > 0 else { return [] }
+
+  let count = Int(size) / MemoryLayout<AudioValueRange>.size
+  var ranges = [AudioValueRange](repeating: AudioValueRange(), count: count)
+  guard AudioObjectGetPropertyData(deviceID, &addr, 0, nil, &size, &ranges) == noErr else { return [] }
+
+  var rates = Set<Int>()
+  for range in ranges {
+    rates.insert(Int(range.mMinimum))
+    if range.mMinimum != range.mMaximum { rates.insert(Int(range.mMaximum)) }
+  }
+  return rates.sorted()
 }
 
 func getInputSampleRate(device: Device?) -> Double? {

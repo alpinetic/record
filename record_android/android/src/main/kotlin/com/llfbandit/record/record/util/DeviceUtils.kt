@@ -11,7 +11,7 @@ import android.os.Build
 
 class DeviceUtils {
   companion object {
-    fun listInputDevicesAsMap(context: Context): List<Map<String, String>> {
+    fun listInputDevicesAsMap(context: Context): List<Map<String, Any>> {
       return listInputDevices(context).map { deviceInfoToMap(it) }
     }
 
@@ -22,15 +22,35 @@ class DeviceUtils {
       return filterSources(devices.asList())
     }
 
-    private fun deviceInfoToMap(device: AudioDeviceInfo): Map<String, String> {
-      val label = buildString {
-        append(device.productName)
-        append(" (")
-        append(typeToString(device.type))
-        if (Build.VERSION.SDK_INT >= 28) append(", ${device.address}")
-        append(")")
+    private fun deviceInfoToMap(device: AudioDeviceInfo): Map<String, Any> {
+      return mapOf(
+        "id" to "${device.id}",
+        "label" to device.productName,
+        "type" to typeToInputDeviceType(device.type),
+        "sampleRates" to device.sampleRates.toList(),
+      )
+    }
+
+    private fun typeToInputDeviceType(type: Int): String {
+      return when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "builtIn"
+        AudioDeviceInfo.TYPE_WIRED_HEADSET -> "wiredHeadset"
+        AudioDeviceInfo.TYPE_LINE_ANALOG,
+        AudioDeviceInfo.TYPE_LINE_DIGITAL,
+        AudioDeviceInfo.TYPE_AUX_LINE -> "lineIn"
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "bluetoothSco"
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "bluetoothA2dp"
+        AudioDeviceInfo.TYPE_BLE_HEADSET,
+        AudioDeviceInfo.TYPE_BLE_SPEAKER,
+        AudioDeviceInfo.TYPE_BLE_BROADCAST -> "bluetoothLe"
+        AudioDeviceInfo.TYPE_USB_DEVICE,
+        AudioDeviceInfo.TYPE_USB_ACCESSORY,
+        AudioDeviceInfo.TYPE_USB_HEADSET -> "usb"
+        AudioDeviceInfo.TYPE_HDMI,
+        AudioDeviceInfo.TYPE_HDMI_ARC,
+        AudioDeviceInfo.TYPE_HDMI_EARC -> "hdmi"
+        else -> "unknown"
       }
-      return mapOf("id" to "${device.id}", "label" to label)
     }
 
     fun deviceInfoFromMap(context: Context, device: Map<String, String>?): AudioDeviceInfo? {

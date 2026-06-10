@@ -68,22 +68,22 @@ public class RecordConfig {
 public class Device {
   let id: String
   let label: String
+  let type: String
 
-  init(id: String, label: String) {
+  init(id: String, label: String, type: String = "unknown") {
     self.id = id
     self.label = label
+    self.type = type
   }
 
   init(map: [String: Any]) {
     self.id = map["id"] as! String
     self.label = map["label"] as! String
+    self.type = map["type"] as? String ?? "unknown"
   }
 
   func toMap() -> [String: Any] {
-    return [
-      "id": id,
-      "label": label
-    ]
+    return ["id": id, "label": label, "type": type]
   }
 }
 

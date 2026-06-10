@@ -366,6 +366,10 @@ namespace record_windows {
 		HRESULT hr = Recorder::CreateInstance(eventHandler, eventRecordHandler, &pRecorder);
 		if (SUCCEEDED(hr))
 		{
+			// Warmup codec capabilities since this is quite slow. This is done only once for all instances.
+			static std::once_flag sWarmFlag;
+			std::call_once(sWarmFlag, [] { AudioDevice::WarmCodecCapsAsync(); });
+
 			auto* pChannel = configChangedChannel.get();
 			pRecorder->SetOnConfigChanged([pChannel](const RecordConfig& cfg) {
 				EncodableMap args = cfg.rawArgs;
