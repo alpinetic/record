@@ -84,7 +84,16 @@ interface IContainerWriter {
   }
 
   /**
-   * If true, ignores samples flagged as [MediaCodec.BUFFER_FLAG_CODEC_CONFIG].
+   * Called when the codec delivers a [MediaCodec.BUFFER_FLAG_CODEC_CONFIG] buffer.
+   * [csd] is null if the buffer could not be read from the codec.
+   * Containers that need codec-specific data in their track format should store it here
+   * and inject it in [addTrack].
    */
-  fun ignoreCodecSpecificData(): Boolean = false
+  fun onCsdBuffer(csd: ByteArray?) {}
+
+  /**
+   * Returns true when the container has everything it needs to accept an [addTrack] call.
+   * The encoder will not call [addTrack] until this returns true.
+   */
+  fun isReadyForSetup(format: MediaFormat): Boolean = true
 }

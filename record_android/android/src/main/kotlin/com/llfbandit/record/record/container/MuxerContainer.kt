@@ -8,18 +8,23 @@ import java.nio.ByteBuffer
 /**
  * Wrapper around [MediaMuxer].
  *
- * @param path            Output file path.
- * @param ignoreCodecSpecificData If true, ignores samples flagged as [MediaCodec.BUFFER_FLAG_CODEC_CONFIG].
- * @param containerFormat A valid [MediaMuxer.OutputFormat] value for the output container format.
+ * @param path                             Output file path.
+ * @param requiresCodecSpecificDataInFormat If true, csd-0 must be present in the [MediaFormat]
+ *                                          passed to [addTrack]. If the codec delivers it via a
+ *                                          [MediaCodec.BUFFER_FLAG_CODEC_CONFIG] buffer instead of
+ *                                          the format, it is injected in [addTrack] automatically.
+ * @param containerFormat                  A valid [MediaMuxer.OutputFormat] value.
  */
 class MuxerContainer(
   val path: String,
-  val ignoreCodecSpecificData: Boolean,
+  private val requiresCodecSpecificDataInFormat: Boolean,
   private val containerFormat: Int
 ) : IContainerWriter {
   private var mMuxer: MediaMuxer? = null
   private var mStarted = false
   private var mStopped = false
+  private var mCsdReceived = false
+  private var mPendingCsd: ByteArray? = null
 
   override fun start() {
     if (mStarted || mStopped) return
@@ -43,6 +48,10 @@ class MuxerContainer(
       mMuxer = MediaMuxer(path, containerFormat)
     }
 
+    if (requiresCodecSpecificDataInFormat && !mediaFormat.containsKey("csd-0")) {
+      mPendingCsd?.let { mediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(it)) }
+    }
+
     return mMuxer!!.addTrack(mediaFormat)
   }
 
@@ -63,7 +72,14 @@ class MuxerContainer(
     mMuxer = null
   }
 
-  override fun ignoreCodecSpecificData(): Boolean {
-    return ignoreCodecSpecificData
+  override fun onCsdBuffer(csd: ByteArray?) {
+    if (!requiresCodecSpecificDataInFormat) return
+    mCsdReceived = true
+    mPendingCsd = csd
+  }
+
+  override fun isReadyForSetup(format: MediaFormat): Boolean {
+    if (!requiresCodecSpecificDataInFormat) return true
+    return format.containsKey("csd-0") || mCsdReceived
   }
 }

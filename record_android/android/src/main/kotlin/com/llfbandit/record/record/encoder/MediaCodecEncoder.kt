@@ -29,6 +29,7 @@ class MediaCodecEncoder(
   private var mInputBufferIndex = -1
   private var mContainerTrack = 0
   private var mContainerSetup = false
+  private var mPendingFormat: MediaFormat? = null
 
   // Semaphore to signal the end of encoding
   @Volatile private var mStoppedCompleter: Semaphore? = null
@@ -144,13 +145,14 @@ class MediaCodecEncoder(
       val container = mContainer
 
       if (container != null && info.size != 0) {
-        // The CSD (Codec-specific Data) is passed to muxer in MediaFormat. So we ignore it.
-        val ignoreSample = container.ignoreCodecSpecificData() && info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+        val isCsd = (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
 
-        if (!ignoreSample) {
+        if (isCsd) {
+          onCsdBuffer(codec, index, info, container)
+        } else {
           val out = codec.getOutputBuffer(index)
 
-          if (out != null) {
+          if (out != null && mContainerSetup) {
             if (container.isStream()) {
               listener.onEncoderStream(container.writeStream(mContainerTrack, out, info))
             } else {
@@ -168,6 +170,33 @@ class MediaCodecEncoder(
     } catch (e: Exception) {
       onError(e)
     }
+  }
+
+  private fun onCsdBuffer(
+    codec: MediaCodec,
+    index: Int,
+    info: MediaCodec.BufferInfo,
+    container: IContainerWriter
+  ) {
+    val csd = codec.getOutputBuffer(index)?.let { out ->
+      out.position(info.offset)
+      out.limit(info.offset + info.size)
+      ByteArray(info.size).also { out.get(it) }
+    }
+    container.onCsdBuffer(csd)
+    trySetupContainer()
+  }
+
+  private fun trySetupContainer() {
+    if (mContainerSetup) return
+    val container = mContainer ?: return
+    val format = mPendingFormat ?: return
+    if (!container.isReadyForSetup(format)) return
+
+    mContainerSetup = true
+    mContainerTrack = container.addTrack(format)
+    container.start()
+    Log.d("MediaCodecEncoder", "Container setup done: $format")
   }
 
   private fun onError(e: Exception) {
@@ -222,12 +251,9 @@ class MediaCodecEncoder(
 
     override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
       if (mContainerSetup) return
-      mContainerSetup = true
 
-      mContainerTrack = mContainer?.addTrack(format) ?: -1
-      mContainer?.start()
-
-      Log.d("MediaCodecEncoder", "Output format set: $format")
+      mPendingFormat = format
+      trySetupContainer()
     }
   }
 
