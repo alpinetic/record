@@ -15,13 +15,18 @@ internal object FormatCodecSelector {
   fun findCodec(
     format: Format,
     config: RecordConfig,
-    mediaFormat: MediaFormat,
     listener: EncoderListener
-  ): IEncoder {
+  ): Pair<IEncoder, MediaFormat> {
+
+    // Clamp config to device caps.
+    adjustToDeviceCapabilities(config)
+
+    // Load MediaFormat from given config and adjust it from codec caps.
+    val mediaFormat = format.getMediaFormat(config)
+
     if (format.mimeTypeAudio == MediaFormat.MIMETYPE_AUDIO_RAW) {
-      adjustToDeviceCapabilities(format, config, mediaFormat)
       syncConfig(config, mediaFormat)
-      return PassthroughEncoder(config, format, mediaFormat, listener)
+      return Pair(PassthroughEncoder(config, format, mediaFormat, listener), mediaFormat)
     }
 
     val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS)
@@ -31,8 +36,8 @@ internal object FormatCodecSelector {
 
       try {
         val caps = info.getCapabilitiesForType(format.mimeTypeAudio)
-        if (caps != null && adjustToCapabilities(format, caps, config, mediaFormat)) {
-          return MediaCodecEncoder(config, format, mediaFormat, listener, info.name)
+        if (caps != null && adjustToCapabilities(caps, config, mediaFormat)) {
+          return Pair(MediaCodecEncoder(config, format, mediaFormat, listener, info.name), mediaFormat)
         }
       } catch (_: IllegalArgumentException) {
         // type not supported by this codec
@@ -48,13 +53,10 @@ internal object FormatCodecSelector {
    * Returns true if the format is supported after adjustment.
    */
   private fun adjustToCapabilities(
-    format: Format,
     caps: MediaCodecInfo.CodecCapabilities,
     config: RecordConfig,
     mediaFormat: MediaFormat
   ): Boolean {
-    adjustToDeviceCapabilities(format, config, mediaFormat)
-
     var supported = caps.isFormatSupported(mediaFormat)
 
     if (!supported) {
@@ -63,23 +65,17 @@ internal object FormatCodecSelector {
       if (audioCapabilities != null) {
         mediaFormat.setInteger(
           MediaFormat.KEY_BIT_RATE,
-          checkBounds(audioCapabilities.bitrateRange, config.bitRate)
+          checkBounds(audioCapabilities.bitrateRange, mediaFormat.getInteger(MediaFormat.KEY_BIT_RATE))
         )
         if (audioCapabilities.supportedSampleRates != null) {
-          format.adjustSampleRate(
-            mediaFormat,
-            nearestValue(
-              audioCapabilities.supportedSampleRates,
-              mediaFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-            )
+          mediaFormat.setInteger(
+            MediaFormat.KEY_SAMPLE_RATE,
+            nearestValue(audioCapabilities.supportedSampleRates, mediaFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE))
           )
         }
-        format.adjustNumChannels(
-          mediaFormat,
-          checkBounds(
-            Range(1, audioCapabilities.maxInputChannelCount),
-            mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-          )
+        mediaFormat.setInteger(
+          MediaFormat.KEY_CHANNEL_COUNT,
+          checkBounds(Range(1, audioCapabilities.maxInputChannelCount), mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT))
         )
       }
 
@@ -93,20 +89,14 @@ internal object FormatCodecSelector {
     return supported
   }
 
-  private fun adjustToDeviceCapabilities(
-    format: Format,
-    config: RecordConfig,
-    mediaFormat: MediaFormat
-  ) {
+  private fun adjustToDeviceCapabilities(config: RecordConfig) {
     val device = config.device ?: DeviceUtils.getDefaultInputDevice()
 
     device?.let {
       // PCMReader only supports mono or stereo; ignore any device channel counts above 2.
       val deviceChannelCounts = it.channelCounts.filter { c -> c <= 2 }.toIntArray()
       if (deviceChannelCounts.isNotEmpty()) {
-        val adjustedChannels = nearestValue(deviceChannelCounts, config.numChannels)
-        format.adjustNumChannels(mediaFormat, adjustedChannels)
-        config.numChannels = adjustedChannels
+        config.numChannels = nearestValue(deviceChannelCounts, config.numChannels)
       }
     }
   }

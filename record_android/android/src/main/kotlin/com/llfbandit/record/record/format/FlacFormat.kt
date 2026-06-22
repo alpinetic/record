@@ -13,7 +13,7 @@ class FlacFormat : Format() {
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_FLAC
 
   override fun getMediaFormat(config: RecordConfig): MediaFormat {
-    val format = MediaFormat().apply {
+    return MediaFormat().apply {
       setString(MediaFormat.KEY_MIME, mimeTypeAudio)
       setInteger(MediaFormat.KEY_SAMPLE_RATE, nearestValue(sampleRates, config.sampleRate))
       setInteger(MediaFormat.KEY_CHANNEL_COUNT, config.numChannels)
@@ -22,11 +22,9 @@ class FlacFormat : Format() {
       setInteger(MediaFormat.KEY_BIT_RATE, 0)
       setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, 8)
     }
-
-    return format
   }
 
-  override fun createWriter(path: String?): IContainerWriter {
+  override fun createWriter(mediaFormat: MediaFormat, path: String?): IContainerWriter {
     if (path == null) {
       throw IllegalArgumentException("Path not provided. Stream is not supported.")
     }

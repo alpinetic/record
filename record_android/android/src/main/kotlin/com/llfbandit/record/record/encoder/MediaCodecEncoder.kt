@@ -90,7 +90,7 @@ class MediaCodecEncoder(
       codec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
       codec.start()
 
-      container = format.createWriter(config.path)
+      container = format.createWriter(mediaFormat, config.path)
 
       mCodec = codec
       mContainer = container

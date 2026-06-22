@@ -24,20 +24,13 @@ sealed class Format {
    */
   abstract fun getMediaFormat(config: RecordConfig): MediaFormat
 
-  internal open fun adjustSampleRate(format: MediaFormat, sampleRate: Int) {
-    format.setInteger(MediaFormat.KEY_SAMPLE_RATE, sampleRate)
-  }
-
-  internal open fun adjustNumChannels(format: MediaFormat, numChannels: Int) {
-    format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, numChannels)
-  }
-
   /**
    * Create a container to write the encoded data.
    *
    * @param path The output path if the container writes to file.
+   * @param mediaFormat The final negotiated [MediaFormat] for the encoded stream.
    */
-  abstract fun createWriter(path: String?): IContainerWriter
+  abstract fun createWriter(mediaFormat: MediaFormat, path: String?): IContainerWriter
 
   companion object {
     const val KEY_X_FRAME_SIZE_IN_BYTES = "x-frame-size-in-bytes"
@@ -50,9 +43,7 @@ sealed class Format {
       listener: EncoderListener
     ): Pair<IEncoder, MediaFormat> {
       val format = selectFormat(config)
-      val mediaFormat = format.getMediaFormat(config)
-      val encoder = FormatCodecSelector.findCodec(format, config, mediaFormat, listener)
-      return Pair(encoder, mediaFormat)
+      return FormatCodecSelector.findCodec(format, config, listener)
     }
 
     private fun selectFormat(config: RecordConfig): Format {

@@ -12,12 +12,8 @@ import com.llfbandit.record.record.container.MuxerContainer
 class AacFormat : Format() {
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_AAC
 
-  private var sampleRate: Int = 44100
-  private var numChannels: Int = 2
-  private var aacProfile: Int = MediaCodecInfo.CodecProfileLevel.AACObjectLC
-
   override fun getMediaFormat(config: RecordConfig): MediaFormat {
-    val format = MediaFormat().apply {
+    return MediaFormat().apply {
       setString(MediaFormat.KEY_MIME, mimeTypeAudio)
       setInteger(MediaFormat.KEY_SAMPLE_RATE, config.sampleRate)
       setInteger(MediaFormat.KEY_CHANNEL_COUNT, config.numChannels)
@@ -42,31 +38,20 @@ class AacFormat : Format() {
         )
       }
     }
-
-    sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-    numChannels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-    aacProfile = format.getInteger(MediaFormat.KEY_AAC_PROFILE)
-
-    return format
   }
 
-  override fun adjustSampleRate(format: MediaFormat, sampleRate: Int) {
-    super.adjustSampleRate(format, sampleRate)
-    this.sampleRate = sampleRate
-  }
-
-  override fun adjustNumChannels(format: MediaFormat, numChannels: Int) {
-    super.adjustNumChannels(format, numChannels)
-    this.numChannels = numChannels
-  }
-
-  override fun createWriter(path: String?): IContainerWriter {
+  override fun createWriter(mediaFormat: MediaFormat, path: String?): IContainerWriter {
     if (path == null) {
+      val aacProfile = mediaFormat.getInteger(MediaFormat.KEY_AAC_PROFILE)
       if (aacProfile != MediaCodecInfo.CodecProfileLevel.AACObjectLC) {
         throw IllegalArgumentException("Stream is not supported.")
       }
 
-      return AdtsContainer(sampleRate, numChannels, aacProfile)
+      return AdtsContainer(
+        mediaFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE),
+        mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT),
+        aacProfile
+      )
     }
 
     return MuxerContainer(path, true, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
