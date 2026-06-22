@@ -1,3 +1,7 @@
+## 2.2.0
+* feat: Add AAC-ADTS streaming.
+* chore: Code improvements / various fixes.
+
 ## 2.1.0
 * feat: Improve InputDevice description with sample rates and type.
 * feat: warmup codec caps when creating Recoder.

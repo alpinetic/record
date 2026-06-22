@@ -1,3 +1,8 @@
+## 2.1.2
+* fix: Throw for unsupported stream encoders.
+* fix: Flac regression from CSD changes.
+* fix: Improve consistency of device/codec caps adjustment flow.
+
 ## 2.1.1
 * fix: Potential result sent twice with SCO.
 

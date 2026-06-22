@@ -1,3 +1,6 @@
+## 2.1.1
+* fix: Throw for unsupported stream encoders.
+
 ## 2.1.0
 * feat: Improve InputDevice description with type.
 * fix: codec/device caps and surface `onConfigChanged` to dart side.
