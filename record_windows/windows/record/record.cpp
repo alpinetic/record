@@ -1,7 +1,9 @@
-#include "record.h"
-#include "record_audio_device.h"
-#include "record_mediatype.h"
+#include "record/record.h"
+#include "audio_device/record_audio_device.h"
+#include "mediatype/record_mediatype.h"
 #include "record_windows_plugin.h"
+#include "encoder/aac_adts_encoder.h"
+#include "encoder/pcm_encoder.h"
 
 namespace record_windows
 {
@@ -87,26 +89,27 @@ namespace record_windows
 	{
 		const auto& enc = config->encoderName;
 		const bool isAac = enc == AudioEncoder::aacLc;
+		const bool isPcm = enc == AudioEncoder::pcm16bits;
 
-		if (!isAac && enc != AudioEncoder::pcm16bits)
+		if (!isAac && !isPcm)
 		{
 			return E_NOTIMPL;
 		}
 
 		HRESULT hr = InitRecording(std::move(config));
 
-		if (SUCCEEDED(hr) && isAac)
+		if (SUCCEEDED(hr))
 		{
-			EventStreamHandler<>* handlerPtr = m_recordEventHandler;
-			AacAdtsEncoder* pEncoder = nullptr;
-			hr = AacAdtsEncoder::Create(*m_pConfig,
-				[handlerPtr](std::vector<uint8_t> packet) {
-					RecordWindowsPlugin::RunOnMainThread([handlerPtr, p = std::move(packet)]() -> void {
-						handlerPtr->Success(std::make_unique<flutter::EncodableValue>(p));
-					});
-				},
-				&pEncoder);
-			if (SUCCEEDED(hr)) m_pStreamEncoder.reset(pEncoder);
+			if (isAac)
+			{
+				AacAdtsEncoder* pEncoder = nullptr;
+				hr = AacAdtsEncoder::Create(*m_pConfig, &pEncoder);
+				if (SUCCEEDED(hr)) m_pStreamEncoder.reset(pEncoder);
+			}
+			else
+			{
+				m_pStreamEncoder = std::make_unique<PcmEncoder>();
+			}
 		}
 		if (SUCCEEDED(hr))
 		{
@@ -277,8 +280,10 @@ namespace record_windows
 		AutoLock lock(m_critsec);
 		HRESULT hr = S_OK;
 
-		// Release reader callback first
+		// Release reader callback first; null the stream handler under the lock
+		// so no in-flight OnReadSample can queue a lambda with a stale pointer.
 		SafeRelease(m_pReader);
+		m_recordEventHandler = nullptr;
 
 		if (m_pSource)
 		{
@@ -292,7 +297,8 @@ namespace record_windows
 
 		if (m_pWriter)
 		{
-			hr = m_pWriter->Finalize();
+			HRESULT hrFinalize = m_pWriter->Finalize();
+			if (SUCCEEDED(hr)) hr = hrFinalize;
 		}
 
 		if (m_pConfig && m_pConfig->encoderName == AudioEncoder::wav) {
@@ -333,7 +339,6 @@ namespace record_windows
 		HRESULT hr = EndRecording();
 
 		m_stateEventHandler = nullptr;
-		m_recordEventHandler = nullptr;
 		m_onConfigChanged = nullptr;
 
 		return hr;
@@ -473,6 +478,7 @@ namespace record_windows
 
 	std::map<std::string, double> Recorder::GetAmplitude()
 	{
+		AutoLock lock(m_critsec);
 		return {
 			{"current", m_amplitude.current},
 			{"max"    , m_amplitude.peak},

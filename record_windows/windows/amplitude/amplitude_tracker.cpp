@@ -1,4 +1,4 @@
-#include "amplitude_tracker.h"
+#include "amplitude/amplitude_tracker.h"
 
 #include <cmath>
 #include <cstdint>

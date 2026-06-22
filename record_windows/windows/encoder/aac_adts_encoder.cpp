@@ -1,14 +1,15 @@
 #include "encoder/aac_adts_encoder.h"
-#include "record_mediatype.h"
+#include "encoder/codec_caps.h"
+#include "mediatype/record_mediatype.h"
 
 #include <cstring>
 
 namespace record_windows {
 
 // static
-HRESULT AacAdtsEncoder::Create(const RecordConfig& config, PacketCallback onPacket, AacAdtsEncoder** ppOut)
+HRESULT AacAdtsEncoder::Create(const RecordConfig& config, AacAdtsEncoder** ppOut)
 {
-	auto* p = new (std::nothrow) AacAdtsEncoder(std::move(onPacket));
+	auto* p = new (std::nothrow) AacAdtsEncoder();
 	if (!p) return E_OUTOFMEMORY;
 
 	HRESULT hr = p->Init(config);
@@ -18,11 +19,6 @@ HRESULT AacAdtsEncoder::Create(const RecordConfig& config, PacketCallback onPack
 		delete p;
 
 	return hr;
-}
-
-AacAdtsEncoder::AacAdtsEncoder(PacketCallback onPacket)
-	: m_onPacket(std::move(onPacket))
-{
 }
 
 AacAdtsEncoder::~AacAdtsEncoder()
@@ -51,35 +47,32 @@ HRESULT AacAdtsEncoder::Init(const RecordConfig& config)
 	// The encoder only accepts output types it advertises; enumerate and pick best match.
 	if (SUCCEEDED(hr))
 	{
-		const UINT32 reqSr = (UINT32)config.sampleRate;
-		const UINT32 reqCh = (UINT32)config.numChannels;
-		const UINT32 reqBr = (UINT32)config.bitRate;
-		auto absDiff = [](UINT32 a, UINT32 b) -> UINT32 { return a >= b ? a - b : b - a; };
-
-		IMFMediaType* pBest  = NULL;
-		UINT32 bestSr = 0, bestCh = 0, bestBr = 0;
+		std::vector<IMFMediaType*>  types;
+		std::vector<CodecCapsEntry> entries;
 
 		for (DWORD i = 0; ; i++)
 		{
 			IMFMediaType* pType = NULL;
 			if (FAILED(pTransform->GetOutputAvailableType(0, i, &pType))) break;
 
-			UINT32 sr = 0, ch = 0, br = 0;
-			pType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &sr);
-			pType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS,       &ch);
-			pType->GetUINT32(MF_MT_AVG_BITRATE,              &br);
-
-			bool better = (pBest == NULL)
-				|| absDiff(ch, reqCh) < absDiff(bestCh, reqCh)
-				|| (absDiff(ch, reqCh) == absDiff(bestCh, reqCh) && absDiff(sr, reqSr) < absDiff(bestSr, reqSr))
-				|| (absDiff(ch, reqCh) == absDiff(bestCh, reqCh) && absDiff(sr, reqSr) == absDiff(bestSr, reqSr) && absDiff(br, reqBr) < absDiff(bestBr, reqBr));
-
-			if (better) { SafeRelease(pBest); pBest = pType; pBest->AddRef(); bestSr = sr; bestCh = ch; bestBr = br; }
-			SafeRelease(&pType);
+			CodecCapsEntry e = {};
+			pType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &e.sampleRate);
+			pType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS,       &e.channels);
+			pType->GetUINT32(MF_MT_AVG_BITRATE,              &e.bitRate);
+			if (e.sampleRate > 0 && e.channels > 0) {
+				types.push_back(pType);
+				entries.push_back(e);
+			} else {
+				SafeRelease(pType);
+			}
 		}
 
-		if (pBest) { hr = pTransform->SetOutputType(0, pBest, 0); SafeRelease(pBest); }
-		else        { hr = MF_E_NOT_FOUND; }
+		size_t idx = SelectBestCaps(entries,
+			(UINT32)config.numChannels, (UINT32)config.sampleRate, (UINT32)config.bitRate);
+
+		hr = (idx != SIZE_MAX) ? pTransform->SetOutputType(0, types[idx], 0) : MF_E_NOT_FOUND;
+
+		for (auto* t : types) SafeRelease(t);
 	}
 
 	if (SUCCEEDED(hr)) hr = MediaType::CreateInputProfile(config, &pTypeIn);
@@ -102,16 +95,16 @@ HRESULT AacAdtsEncoder::Init(const RecordConfig& config)
 	return hr;
 }
 
-HRESULT AacAdtsEncoder::Feed(IMFSample* pSample)
+std::vector<std::vector<uint8_t>> AacAdtsEncoder::Feed(IMFSample* pSample)
 {
 	HRESULT hr = m_pTransform->ProcessInput(0, pSample, 0);
-	if (SUCCEEDED(hr))
-		Drain();
-	return hr;
+	return SUCCEEDED(hr) ? Drain() : std::vector<std::vector<uint8_t>>{};
 }
 
-void AacAdtsEncoder::Drain()
+std::vector<std::vector<uint8_t>> AacAdtsEncoder::Drain()
 {
+	std::vector<std::vector<uint8_t>> packets;
+
 	MFT_OUTPUT_STREAM_INFO si = {};
 	m_pTransform->GetOutputStreamInfo(0, &si);
 	const bool  mftProvidesBuffer = (si.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES) != 0;
@@ -158,12 +151,15 @@ void AacAdtsEncoder::Drain()
 				{
 					BYTE* pData  = NULL;
 					DWORD cbData = 0;
-					if (SUCCEEDED(pContiguous->Lock(&pData, NULL, &cbData)) && cbData > 0)
+					if (SUCCEEDED(pContiguous->Lock(&pData, NULL, &cbData)))
 					{
-						std::vector<uint8_t> packet(7 + cbData);
-						BuildAdtsHeader(packet.data(), m_sampleRate, m_numChannels, cbData);
-						std::memcpy(packet.data() + 7, pData, cbData);
-						m_onPacket(std::move(packet));
+						if (cbData > 0)
+						{
+							std::vector<uint8_t> packet(7 + cbData);
+							BuildAdtsHeader(packet.data(), m_sampleRate, m_numChannels, cbData);
+							std::memcpy(packet.data() + 7, pData, cbData);
+							packets.push_back(std::move(packet));
+						}
 						pContiguous->Unlock();
 					}
 					SafeRelease(pContiguous);
@@ -178,6 +174,8 @@ void AacAdtsEncoder::Drain()
 
 		if (FAILED(hr)) break;
 	}
+
+	return packets;
 }
 
 // static
@@ -194,7 +192,7 @@ void AacAdtsEncoder::BuildAdtsHeader(uint8_t* hdr, int sampleRate, int channels,
 	DWORD totalLen = frameLen + 7;
 	hdr[0] = 0xFF;
 	hdr[1] = 0xF1; // MPEG-4, layer=0, no CRC
-	hdr[2] = (uint8_t)((freqIdx << 2) | (channels >> 2));
+	hdr[2] = (uint8_t)((0x01 << 6) | (freqIdx << 2) | (channels >> 2)); // profile=1 (AAC-LC)
 	hdr[3] = (uint8_t)(((channels & 3) << 6) | ((totalLen >> 11) & 0x3));
 	hdr[4] = (uint8_t)((totalLen >> 3) & 0xFF);
 	hdr[5] = (uint8_t)(((totalLen & 7) << 5) | 0x1F);

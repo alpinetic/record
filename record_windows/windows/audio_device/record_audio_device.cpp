@@ -1,8 +1,10 @@
-#include "record_audio_device.h"
+#include "audio_device/record_audio_device.h"
+#include "encoder/codec_caps.h"
 #include "record_config.h"
 #include "utils.h"
 
 #include <mfapi.h>
+#include <mferror.h>
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <mftransform.h>
@@ -23,7 +25,6 @@ static const PROPERTYKEY kAudioEngineDeviceFormat = {
     {0xf19f064d, 0x082c, 0x4e27, {0xbc,0x73,0x68,0x82,0xa1,0xbb,0x8e,0x4c}}, 0
 };
 
-struct CodecCapsEntry { UINT32 channels, sampleRate, bitRate; };
 static std::mutex                                                    gCapsMutex;
 static std::unordered_map<std::string, std::vector<CodecCapsEntry>> gCapsCache;
 
@@ -152,7 +153,11 @@ HRESULT ListInputDevices(flutter::EncodableList& devices)
 			if (FAILED(pCollection->Item(i, &pDevice))) continue;
 
 			LPWSTR pwszId = NULL;
-			pDevice->GetId(&pwszId);
+			if (FAILED(pDevice->GetId(&pwszId)) || !pwszId)
+			{
+				SafeRelease(&pDevice);
+				continue;
+			}
 
 			if (SUCCEEDED(pDevice->OpenPropertyStore(STGM_READ, &pProps)))
 			{
@@ -337,41 +342,22 @@ HRESULT AdjustConfigToCodecCaps(RecordConfig& config)
 
 	if (caps.empty())
 	{
-		caps = FetchCodecCaps(subtypeGuid);
+		auto fetched = FetchCodecCaps(subtypeGuid);
 		std::lock_guard<std::mutex> lock(gCapsMutex);
-		gCapsCache[config.encoderName] = caps;
+		// Another thread may have populated the cache while we were fetching.
+		auto result = gCapsCache.emplace(config.encoderName, std::move(fetched));
+		caps = result.first->second;
 	}
 
-	if (!caps.empty())
+	if (caps.empty())
+		return MF_E_NOT_FOUND;
+
+	size_t idx = SelectBestCaps(caps, (UINT32)config.numChannels, (UINT32)config.sampleRate, (UINT32)config.bitRate);
+	if (idx != SIZE_MAX)
 	{
-		const UINT32 reqSr = (UINT32)config.sampleRate;
-		const UINT32 reqCh = (UINT32)config.numChannels;
-		const UINT32 reqBr = (UINT32)config.bitRate;
-
-		auto absDiff = [](UINT32 a, UINT32 b) -> UINT32 {
-			return a >= b ? a - b : b - a;
-		};
-
-		UINT32 bestCh = caps[0].channels;
-		for (const auto& e : caps)
-			if (absDiff(e.channels, reqCh) < absDiff(bestCh, reqCh))
-				bestCh = e.channels;
-
-		UINT32 bestSr = 0;
-		for (const auto& e : caps)
-			if (e.channels == bestCh)
-				if (bestSr == 0 || absDiff(e.sampleRate, reqSr) < absDiff(bestSr, reqSr))
-					bestSr = e.sampleRate;
-
-		UINT32 bestBr = 0;
-		for (const auto& e : caps)
-			if (e.channels == bestCh && e.sampleRate == bestSr)
-				if (bestBr == 0 || absDiff(e.bitRate, reqBr) < absDiff(bestBr, reqBr))
-					bestBr = e.bitRate;
-
-		config.numChannels = (int)bestCh;
-		config.sampleRate  = (int)bestSr;
-		if (bestBr > 0) config.bitRate = (int)bestBr;
+		config.numChannels = (int)caps[idx].channels;
+		config.sampleRate  = (int)caps[idx].sampleRate;
+		if (caps[idx].bitRate > 0) config.bitRate = (int)caps[idx].bitRate;
 	}
 
 	return S_OK;

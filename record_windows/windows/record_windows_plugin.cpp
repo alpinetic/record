@@ -1,5 +1,5 @@
 #include "record_windows_plugin.h"
-#include "record_audio_device.h"
+#include "audio_device/record_audio_device.h"
 #include <mfreadwrite.h>
 #include <Mferror.h>
 #include "record_config.h"

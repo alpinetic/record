@@ -7,14 +7,13 @@
 #include <Mfreadwrite.h>
 
 #include <assert.h>
-
 #include <memory>
 
 #include "utils.h"
 #include "record_config.h"
-#include "encoder/aac_adts_encoder.h"
+#include "encoder/stream_encoder.h"
 #include "event_stream_handler.h"
-#include "amplitude_tracker.h"
+#include "amplitude/amplitude_tracker.h"
 
 namespace record_windows
 {
@@ -62,6 +61,10 @@ namespace record_windows
 		void UpdateState(RecordState state);
 		HRESULT EndRecording();
 
+		void    RebaseTimestamp(LONGLONG& llTimestamp);
+		HRESULT ProcessSample(DWORD dwStreamIndex, LONGLONG llTimestamp, IMFSample* pSample);
+		HRESULT ProcessBuffer(IMFSample* pSample);
+
 		long                m_nRefCount;
 		CritSec             m_critsec;
 
@@ -70,7 +73,7 @@ namespace record_windows
 		IMFSourceReader*           m_pReader;
 		IMFSinkWriter*             m_pWriter;
 		IMFMediaType*              m_pMediaType;
-		std::unique_ptr<AacAdtsEncoder> m_pStreamEncoder;
+		std::unique_ptr<IStreamEncoder> m_pStreamEncoder;
 		std::wstring               m_recordingPath;
 		bool                       m_mfStarted = false;
 

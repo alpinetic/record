@@ -1,4 +1,4 @@
-#include "record_mediatype.h"
+#include "mediatype/record_mediatype.h"
 #include "utils.h"
 
 #pragma warning(disable: 4201)
