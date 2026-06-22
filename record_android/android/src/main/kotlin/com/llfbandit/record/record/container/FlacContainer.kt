@@ -14,6 +14,16 @@ class FlacContainer(path: String) : IContainerWriter {
   private var isStarted = false
   private var lastPresentationTimeUs = -1L
   private var track = -1
+  private var csdData: ByteArray? = null
+
+  override fun onCsdBuffer(csd: ByteArray?) {
+    if (csd == null) return
+    if (isStarted) {
+      Os.write(file.fd, ByteBuffer.wrap(csd))
+    } else {
+      csdData = csd
+    }
+  }
 
   override fun start() {
     if (isStarted) {
@@ -22,6 +32,11 @@ class FlacContainer(path: String) : IContainerWriter {
 
     Os.lseek(file.fd, 0, OsConstants.SEEK_SET)
     Os.ftruncate(file.fd, 0)
+
+    csdData?.let {
+      Os.write(file.fd, ByteBuffer.wrap(it))
+      csdData = null
+    }
 
     isStarted = true
   }
@@ -74,9 +89,7 @@ class FlacContainer(path: String) : IContainerWriter {
 
     Os.write(file.fd, byteBuffer)
 
-    if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
-      lastPresentationTimeUs = bufferInfo.presentationTimeUs
-    }
+    lastPresentationTimeUs = bufferInfo.presentationTimeUs
   }
 
   /**
