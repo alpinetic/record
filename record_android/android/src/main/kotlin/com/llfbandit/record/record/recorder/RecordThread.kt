@@ -26,6 +26,7 @@ class RecordThread(
   @Volatile private var mPcmReaderRef: PCMReader? = null
 
   override fun onEncoderFailure(ex: Exception) {
+    stopRecording()
     recorderListener.onFailure(ex)
   }
 
@@ -74,7 +75,10 @@ class RecordThread(
 
   fun getAmplitude(): Double = mPcmReaderRef?.getAmplitude() ?: -160.0
 
+  @Throws(Exception::class)
   fun startRecording() {
+    Format.checkStreamSupport(config)
+
     val startLatch = CountDownLatch(1)
 
     mRecordThread = Thread {

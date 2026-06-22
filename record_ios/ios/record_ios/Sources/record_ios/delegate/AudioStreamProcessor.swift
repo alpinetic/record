@@ -33,8 +33,13 @@ class AudioStreamProcessor {
       let aac = AacAdtsEncoder()
       try aac.setup(config: config, format: outputFormat)
       m_encoder = aac
-    } else {
+    } else if config.encoder == AudioEncoder.pcm16bits.rawValue {
       m_encoder = Pcm16BitsEncoder()
+    } else {
+      throw RecorderError.error(
+        message: "Failed to start recording",
+        details: "Encoder '\(config.encoder)' is not supported for stream recording."
+      )
     }
   }
 

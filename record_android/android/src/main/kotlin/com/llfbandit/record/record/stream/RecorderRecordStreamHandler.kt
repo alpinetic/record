@@ -24,4 +24,10 @@ class RecorderRecordStreamHandler : EventChannel.StreamHandler {
       eventSink?.success(buffer)
     }
   }
+
+  fun sendErrorEvent(ex: Exception) {
+    uiThreadHandler.post {
+      eventSink?.error("-1", ex.message, ex)
+    }
+  }
 }

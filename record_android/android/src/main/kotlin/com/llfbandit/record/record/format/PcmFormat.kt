@@ -8,6 +8,8 @@ import com.llfbandit.record.record.container.RawContainer
 class PcmFormat : Format() {
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_RAW
 
+  override fun supportsStream(config: RecordConfig): Boolean = true
+
   override fun getMediaFormat(config: RecordConfig): MediaFormat {
     val frameSize = config.numChannels * 16 / 8
 

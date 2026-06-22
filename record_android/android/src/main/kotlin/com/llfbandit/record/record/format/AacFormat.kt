@@ -12,6 +12,8 @@ import com.llfbandit.record.record.container.MuxerContainer
 class AacFormat : Format() {
   override val mimeTypeAudio: String = MediaFormat.MIMETYPE_AUDIO_AAC
 
+  override fun supportsStream(config: RecordConfig): Boolean = config.encoder == AudioEncoder.AacLc
+
   override fun getMediaFormat(config: RecordConfig): MediaFormat {
     return MediaFormat().apply {
       setString(MediaFormat.KEY_MIME, mimeTypeAudio)

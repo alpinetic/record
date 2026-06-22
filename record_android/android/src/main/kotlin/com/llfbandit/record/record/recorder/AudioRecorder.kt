@@ -118,6 +118,7 @@ class AudioRecorder(
   override fun onFailure(ex: Exception) {
     Log.e(TAG, ex.message, ex)
     recorderStateStreamHandler.sendStateErrorEvent(ex)
+    recorderRecordStreamHandler.sendErrorEvent(ex)
   }
 
   override fun onAudioChunk(chunk: ByteArray) {
