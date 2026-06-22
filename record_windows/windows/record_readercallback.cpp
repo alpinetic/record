@@ -59,6 +59,12 @@ namespace record_windows
 					hr = m_pWriter->WriteSample(dwStreamIndex, pSample);
 				}
 
+				// AAC streaming: feed sample to encoder
+				if (SUCCEEDED(hr) && m_recordEventHandler && !m_pWriter && m_pStreamEncoder)
+				{
+					m_pStreamEncoder->Feed(pSample);
+				}
+
 				if (SUCCEEDED(hr))
 				{
 					IMFMediaBuffer* pBuffer = NULL;
@@ -75,8 +81,8 @@ namespace record_windows
 							// Update total data written
 							m_dataWritten += size;
 
-							// Send data to stream when there's no writer
-							if (m_recordEventHandler && !m_pWriter) {
+							// PCM streaming: send raw bytes when there's no encoder
+							if (m_recordEventHandler && !m_pWriter && !m_pStreamEncoder) {
 								std::vector<uint8_t> bytes(pChunk, pChunk + size);
 
 								EventStreamHandler<>* handlerPtr = m_recordEventHandler;

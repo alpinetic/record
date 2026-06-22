@@ -85,13 +85,29 @@ namespace record_windows
 
 	HRESULT Recorder::StartStream(std::unique_ptr<RecordConfig> config)
 	{
-		if (config->encoderName != AudioEncoder::pcm16bits)
+		const auto& enc = config->encoderName;
+		const bool isAac = enc == AudioEncoder::aacLc;
+
+		if (!isAac && enc != AudioEncoder::pcm16bits)
 		{
 			return E_NOTIMPL;
 		}
 
 		HRESULT hr = InitRecording(std::move(config));
 
+		if (SUCCEEDED(hr) && isAac)
+		{
+			EventStreamHandler<>* handlerPtr = m_recordEventHandler;
+			AacAdtsEncoder* pEncoder = nullptr;
+			hr = AacAdtsEncoder::Create(*m_pConfig,
+				[handlerPtr](std::vector<uint8_t> packet) {
+					RecordWindowsPlugin::RunOnMainThread([handlerPtr, p = std::move(packet)]() -> void {
+						handlerPtr->Success(std::make_unique<flutter::EncodableValue>(p));
+					});
+				},
+				&pEncoder);
+			if (SUCCEEDED(hr)) m_pStreamEncoder.reset(pEncoder);
+		}
 		if (SUCCEEDED(hr))
 		{
 			// Request the first sample
@@ -290,6 +306,8 @@ namespace record_windows
 
 		m_amplitude.reset();
 		m_dataWritten = 0;
+
+		m_pStreamEncoder.reset();
 
 		if (m_mfStarted)
 		{
