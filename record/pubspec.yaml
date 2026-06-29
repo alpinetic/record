@@ -1,6 +1,6 @@
 name: record
 description: Audio recorder from microphone to file or stream with multiple codecs, bit rate and sampling rate options.
-version: 7.1.0
+version: 7.1.1
 homepage: https://github.com/llfbandit/record/tree/main/record
 
 topics: 
@@ -18,13 +18,13 @@ dependencies:
   flutter:
     sdk: flutter
 
-  record_platform_interface: ^2.1.0
-  record_web: ^2.1.0
-  record_windows: ^2.1.0
+  record_android: ^2.1.2
+  record_ios: ^2.1.1
   record_linux: ^2.1.0
-  record_android: ^2.1.0
-  record_ios: ^2.1.0
-  record_macos: ^2.1.0
+  record_macos: ^2.1.1
+  record_platform_interface: ^2.1.0
+  record_web: ^2.1.1
+  record_windows: ^2.2.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

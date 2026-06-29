@@ -11,6 +11,8 @@ part 'part/record_convert.dart';
 part 'part/record_state.dart';
 part 'part/record_stream.dart';
 
+typedef _SafeCall<T> = Future<T> Function(Future<T> Function() fn);
+
 /// Audio recorder for capturing audio from input devices.
 ///
 class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
@@ -106,7 +108,9 @@ class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
   ///
   /// Only called when at least one field differs from what was requested.
   /// Pass [null] to unregister.
-  Future<void> setOnConfigChanged(void Function(RecordConfig config)? callback) {
+  Future<void> setOnConfigChanged(
+    void Function(RecordConfig config)? callback,
+  ) {
     return _safeCall(() async {
       _platform.setOnConfigChanged(_recorderId, callback);
     });
@@ -178,7 +182,12 @@ class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
   /// iOS platform specific methods.
   ///
   /// Returns [null] when not on iOS platform.
-  RecordIos? get ios => _platform.getIos(_recorderId);
+  RecordIos? get ios {
+    final inner = _platform.getIos(_recorderId);
+    if (inner == null) return null;
+
+    return _RecordIosSafeWrapper(inner, _safeCall);
+  }
 
   /// Initialize state stream.
   /// Must be called outside of `_safeCall` to avoid deadlock.
@@ -212,5 +221,41 @@ class AudioRecorder with _AmplitudeMixin, _StateMixin, _StreamMixin {
     } finally {
       _semaphore.release();
     }
+  }
+}
+
+/// Wrapper around semaphore for safe calls.
+class _RecordIosSafeWrapper implements RecordIos {
+  final RecordIos inner;
+  final _SafeCall<void> safeCall;
+
+  _RecordIosSafeWrapper(this.inner, this.safeCall);
+
+  @override
+  Future<void> manageAudioSession(bool manage) {
+    return safeCall(() => inner.manageAudioSession(manage));
+  }
+
+  @override
+  Future<void> setAudioSessionActive(bool active) {
+    return safeCall(() => inner.setAudioSessionActive(active));
+  }
+
+  @override
+  Future<void> setAudioSessionCategory({
+    IosAudioCategory category = IosAudioCategory.playAndRecord,
+    List<IosAudioCategoryOptions> options = const [
+      IosAudioCategoryOptions.duckOthers,
+      IosAudioCategoryOptions.defaultToSpeaker,
+      IosAudioCategoryOptions.allowBluetooth,
+      IosAudioCategoryOptions.allowBluetoothA2DP,
+    ],
+  }) {
+    return safeCall(() {
+      return inner.setAudioSessionCategory(
+        category: category,
+        options: options,
+      );
+    });
   }
 }
