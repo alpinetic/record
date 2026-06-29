@@ -4,10 +4,10 @@ import 'package:web/web.dart' as web;
 
 import 'package:flutter/foundation.dart';
 import 'package:record_platform_interface/record_platform_interface.dart';
-import 'package:record_web/mime_types.dart';
-import 'package:record_web/recorder/delegate/media_recorder_delegate.dart';
-import 'package:record_web/recorder/delegate/mic_recorder_delegate.dart';
-import 'package:record_web/recorder/delegate/recorder_delegate.dart';
+import 'package:record_web/src/mime_types.dart';
+import 'package:record_web/src/recorder/delegate/media_recorder_delegate.dart';
+import 'package:record_web/src/recorder/delegate/mic_recorder_delegate.dart';
+import 'package:record_web/src/recorder/delegate/recorder_delegate.dart';
 
 const kMaxAmplitude = 0.0;
 const kMinAmplitude = -160.0;
@@ -57,16 +57,22 @@ class Recorder {
     final mediaDevices = web.window.navigator.mediaDevices;
     try {
       var deviceInfos = await mediaDevices.enumerateDevices().toDart;
-      var inputs = deviceInfos.toDart.where((d) => d.kind == 'audioinput').toList();
+      var inputs = deviceInfos.toDart
+          .where((d) => d.kind == 'audioinput')
+          .toList();
 
       // Before permission is granted, browsers return devices without labels (or none at all).
       if (inputs.isEmpty || inputs.every((d) => d.label.isEmpty)) {
         await _requestPermission();
         deviceInfos = await mediaDevices.enumerateDevices().toDart;
-        inputs = deviceInfos.toDart.where((d) => d.kind == 'audioinput').toList();
+        inputs = deviceInfos.toDart
+            .where((d) => d.kind == 'audioinput')
+            .toList();
       }
 
-      return inputs.map((d) => InputDevice(id: d.deviceId, label: d.label)).toList();
+      return inputs
+          .map((d) => InputDevice(id: d.deviceId, label: d.label))
+          .toList();
     } catch (error) {
       debugPrint(error.toString());
       return [];
@@ -166,9 +172,7 @@ class Recorder {
     }
   }
 
-  Future<Stream<Uint8List>> startStream(
-    RecordConfig config,
-  ) async {
+  Future<Stream<Uint8List>> startStream(RecordConfig config) async {
     switch (config.encoder) {
       case AudioEncoder.pcm16bits:
         await _delegate?.dispose();

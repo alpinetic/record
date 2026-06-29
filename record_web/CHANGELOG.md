@@ -1,3 +1,6 @@
+## 2.1.1
+* fix: Hide internals in src/ folder.
+
 ## 2.1.0
 * fix: codec/device caps and surface `onConfigChanged` to dart side.
 * fix: Amplitude calculation.

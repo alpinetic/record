@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:math' as math;
-import 'package:record_web/webm/webm_duration_fixer.dart';
+import 'package:record_web/src/webm/webm_duration_fixer.dart';
 import 'package:web/web.dart' as web;
 
 import 'package:flutter/foundation.dart';
 import 'package:record_platform_interface/record_platform_interface.dart';
-import 'package:record_web/mime_types.dart';
-import 'package:record_web/recorder/delegate/recorder_delegate.dart';
-import 'package:record_web/recorder/recorder.dart';
+import 'package:record_web/src/mime_types.dart';
+import 'package:record_web/src/recorder/delegate/recorder_delegate.dart';
+import 'package:record_web/src/recorder/recorder.dart';
 
 class MediaRecorderDelegate extends RecorderDelegate {
   // Media recorder object

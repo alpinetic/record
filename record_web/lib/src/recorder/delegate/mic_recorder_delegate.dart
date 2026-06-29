@@ -5,11 +5,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:record_platform_interface/record_platform_interface.dart';
-import 'package:record_web/encoder/encoder.dart';
-import 'package:record_web/encoder/pcm_encoder.dart';
-import 'package:record_web/encoder/wav_encoder.dart';
-import 'package:record_web/recorder/delegate/recorder_delegate.dart';
-import 'package:record_web/recorder/recorder.dart';
+import 'package:record_web/src/encoder/encoder.dart';
+import 'package:record_web/src/encoder/pcm_encoder.dart';
+import 'package:record_web/src/encoder/wav_encoder.dart';
+import 'package:record_web/src/recorder/delegate/recorder_delegate.dart';
+import 'package:record_web/src/recorder/recorder.dart';
 import 'package:web/web.dart' as web;
 
 class MicRecorderDelegate extends RecorderDelegate {
@@ -140,8 +140,9 @@ class MicRecorderDelegate extends RecorderDelegate {
       workletNode.port.onmessage =
           ((web.MessageEvent event) => _onMessageStream(event)).toJS;
     } else {
-      workletNode.port.onmessage =
-          ((web.MessageEvent event) => _onMessage(event)).toJS;
+      workletNode.port.onmessage = ((web.MessageEvent event) => _onMessage(
+        event,
+      )).toJS;
     }
 
     _source = source;
@@ -164,11 +165,14 @@ class MicRecorderDelegate extends RecorderDelegate {
       context,
       'recorder.worklet',
       web.AudioWorkletNodeOptions(
-        parameterData: {
-          'numChannels'.toJS: config.numChannels.toJS,
-          'sampleRate'.toJS: config.sampleRate.toJS,
-          'streamBufferSize'.toJS: (config.streamBufferSize ?? 2048).toJS,
-        }.jsify()! as JSObject,
+        parameterData:
+            {
+                  'numChannels'.toJS: config.numChannels.toJS,
+                  'sampleRate'.toJS: config.sampleRate.toJS,
+                  'streamBufferSize'.toJS:
+                      (config.streamBufferSize ?? 2048).toJS,
+                }.jsify()!
+                as JSObject,
       ),
     );
   }
