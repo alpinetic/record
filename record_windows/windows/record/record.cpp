@@ -33,6 +33,7 @@ namespace record_windows
 		m_pPresentationDescriptor(NULL),
 		m_stateEventHandler(stateEventHandler),
 		m_recordEventHandler(recordEventHandler),
+		m_recordEventHandlerOrigin(recordEventHandler),
 		m_recordingPath(std::wstring()),
 		m_pMediaType(NULL)
 	{
@@ -98,6 +99,12 @@ namespace record_windows
 
 		HRESULT hr = InitRecording(std::move(config));
 
+		if (SUCCEEDED(hr))
+		{
+			// EndRecording (called inside InitRecording) nulls m_recordEventHandler to guard
+			// against in-flight callbacks after stop. Restore it here before samples arrive.
+			m_recordEventHandler = m_recordEventHandlerOrigin;
+		}
 		if (SUCCEEDED(hr))
 		{
 			if (isAac)

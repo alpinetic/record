@@ -1,3 +1,6 @@
+## 2.2.1
+* fix: restore record event handler after stream start.
+
 ## 2.2.0
 * feat: Add AAC-ADTS streaming.
 * chore: Code improvements / various fixes.

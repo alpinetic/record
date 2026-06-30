@@ -87,6 +87,7 @@ namespace record_windows
 
 		EventStreamHandler<>* m_stateEventHandler;
 		EventStreamHandler<>* m_recordEventHandler;
+		EventStreamHandler<>* m_recordEventHandlerOrigin;
 		std::function<void(const RecordConfig&)> m_onConfigChanged;
 
 		RecordState                m_recordState = RecordState::stop;
