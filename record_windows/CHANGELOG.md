@@ -1,3 +1,6 @@
+## 2.2.2
+* fix: non-ascii char in comment preventing compilation when using simplified shinese codepage.
+
 ## 2.2.1
 * fix: restore record event handler after stream start.
 
