@@ -1,3 +1,6 @@
+## 2.1.1
+* fix: don't close ffmpeg stdin while pipe is bound.
+
 ## 2.1.0
 * feat: Improve InputDevice description with sample rates.
 * fix: codec/device caps and surface `onConfigChanged` to dart side.

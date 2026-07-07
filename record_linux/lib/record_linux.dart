@@ -20,6 +20,7 @@ class RecordLinux extends RecordPlatform {
   Process? _parecordProcess;
   Process? _ffmpegProcess;
   StreamController<List<int>>? _inputPcmController;
+  Future<void>? _ffmpegPipeDone;
   double _currentAmplitude = -160.0;
   double _maxAmplitude = -160.0;
   void Function(RecordConfig config)? _configChangedHandler;
@@ -155,10 +156,14 @@ class RecordLinux extends RecordPlatform {
     _parecordProcess?.kill();
     _parecordProcess = null;
 
-    // Close ffmpeg stdin and wait for it to finish
+    // Wait for the pipe to flush and close ffmpeg stdin
     if (_ffmpegProcess case final process?) {
-      // Wait for ffmpeg to finish writing
-      await process.stdin.close();
+      try {
+        await _ffmpegPipeDone;
+      } catch (_) {
+        // ffmpeg may have exited early (broken pipe)
+      }
+      _ffmpegPipeDone = null;
       await process.exitCode;
       _ffmpegProcess = null;
     }
@@ -506,7 +511,8 @@ class RecordLinux extends RecordPlatform {
     }, onDone: () => _inputPcmController?.close());
 
     // Pipe the PCM data from our controller to ffmpeg for encoding
-    // This uses pipe() for proper backpressure handling
-    _inputPcmController!.stream.pipe(_ffmpegProcess!.stdin);
+    // This uses pipe() for proper backpressure handling.
+    // pipe() closes stdin itself when the stream ends.
+    _ffmpegPipeDone = _inputPcmController!.stream.pipe(_ffmpegProcess!.stdin);
   }
 }
